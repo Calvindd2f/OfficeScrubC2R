@@ -181,7 +181,29 @@ function Uninstall-OfficeProducts {
         return
     }
 
-    Write-LogSubHeader "Uninstalling Office products"
+    Write-LogSubHeader "Stage # 1 - Uninstall"
+
+    # Clean licenses first
+    Clear-OfficeLicenses
+
+    # Stop Office processes
+    Write-LogSubHeader "End running processes"
+    if ($script:C2RSuite.Count -eq 0 -or -not $script:KeepSku) {
+        Clear-ShellIntegration
+    }
+    Stop-OfficeProcesses
+
+    # Remove scheduled tasks
+    if (-not $script:DetectOnly) {
+        Remove-ScheduledTasks
+    }
+
+    # Unpin and clean shortcuts while they're still valid
+    Write-LogSubHeader "Clean shortcuts"
+    Clear-Shortcuts -RootPath $script:AllUsersProfile -Delete -Unpin
+    if (Test-Path $env:SystemDrive\Users) {
+        Clear-Shortcuts -RootPath "$env:SystemDrive\Users" -Delete -Unpin
+    }
 
     # Check OSE service state
     Write-LogSubHeader "Check state of OSE service"
@@ -329,7 +351,8 @@ function Remove-PublishedComponents {
             foreach ($filePath in $filePaths) {
                 try {
                     [System.IO.File]::Delete($filePath)
-                } catch {
+                }
+                catch {
                     Write-Log ("Failed to delete manifest file: {0} - {1}" -f $filePath, $_.Exception.Message)
                 }
             }
@@ -401,7 +424,8 @@ function Uninstall-MSIProducts {
         foreach ($product in $products) {
             if (Test-ProductInScope $product) {
                 $inScopeProducts += $product
-            } else {
+            }
+            else {
                 $outOfScopeProducts += $product
             }
         }
@@ -419,12 +443,13 @@ function Uninstall-MSIProducts {
                 $args = @("/x$product", "REBOOT=ReallySuppress", "NOREMOVESPAWN=True")
                 if ($script:Quiet) {
                     $args += "/q"
-                } else {
+                }
+                else {
                     $args += "/qb-!"
                 }
                 $args += "/l*v"
                 $args += "`"$logFile`""
-                $msiexecArgsList += ,@($product, $args, $logFile)
+                $msiexecArgsList += , @($product, $args, $logFile)
                 Write-LogOnly "Call msiexec with 'msiexec.exe $($args -join ' ')'"
             }
 
@@ -472,268 +497,429 @@ function Test-ProductInScope {
     return $false
 }
 
-function Remove-OfficeFiles {
-    Write-LogSubHeader "Removing Office files and folders"
-
-    # Stop Office processes first
-    Stop-OfficeProcesses -Force
-
-    # Define Office installation paths
-    $officePaths = @(
-        "$script:ProgramFiles\Microsoft Office",
-        "$script:ProgramFiles\Microsoft Office 15",
-        "$script:ProgramFiles\Microsoft Office 16",
-        "$script:ProgramFilesX86\Microsoft Office",
-        "$script:ProgramFilesX86\Microsoft Office 15",
-        "$script:ProgramFilesX86\Microsoft Office 16",
-        "$script:CommonProgramFiles\Microsoft Shared\Office15",
-        "$script:CommonProgramFiles\Microsoft Shared\Office16",
-        "$script:CommonProgramFilesX86\Microsoft Shared\Office15",
-        "$script:CommonProgramFilesX86\Microsoft Shared\Office16"
-    )
-
-    foreach ($path in $officePaths) {
-        if (Test-Path $path) {
-            Write-Log ("Removing Office path: {0}" -f $path)
-            if (-not $script:DetectOnly) {
-                Remove-FolderRecursive -Path $path -Force
-            }
-        }
-    }
-
-    # Remove user-specific Office data
-    Remove-UserOfficeData
-}
-
-function Remove-UserOfficeData {
-    Write-LogSubHeader "Removing user-specific Office data"
-
-    $userPaths = @(
-        "$script:AppData\Microsoft\Office",
-        "$script:LocalAppData\Microsoft\Office",
-        "$script:LocalAppData\Microsoft\Office\15.0",
-        "$script:LocalAppData\Microsoft\Office\16.0",
-        "$script:LocalAppData\Microsoft\Office\ClickToRun"
-    )
-
-    foreach ($path in $userPaths) {
-        if (Test-Path $path) {
-            Write-Log ("Removing user Office data: {0}" -f $path)
-            if (-not $script:DetectOnly) {
-                Remove-FolderRecursive -Path $path -Force
-            }
-        }
-    }
-}
+# File removal is now handled in Complete-Cleanup to match VBS flow
 
 function Clean-OfficeRegistry {
-    Write-LogSubHeader "Cleaning Office registry entries"
+    Write-LogSubHeader "Stage # 2 - CleanUp - Registry"
 
-    # Remove Office registry keys
-    $officeRegKeys = @(
-        "SOFTWARE\Microsoft\Office\15.0",
-        "SOFTWARE\Microsoft\Office\16.0",
-        "SOFTWARE\Microsoft\Office\ClickToRun",
-        "SOFTWARE\Microsoft\OfficeCommon",
-        "SOFTWARE\Microsoft\Office\Common"
-    )
+    Stop-OfficeProcesses
 
-    foreach ($key in $officeRegKeys) {
-        Remove-RegistryKey -Hive CurrentUser -SubKey $key
-        Remove-RegistryKey -Hive LocalMachine -SubKey $key
+    # HKCU Registration
+    Remove-RegistryKey -Hive CurrentUser -SubKey "Software\Microsoft\Office\15.0\Registration"
+    Remove-RegistryKey -Hive CurrentUser -SubKey "Software\Microsoft\Office\16.0\Registration"
+    Remove-RegistryKey -Hive CurrentUser -SubKey "Software\Microsoft\Office\Registration"
+
+    # Virtual InstallRoot
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\15.0\Common\InstallRoot\Virtual"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\16.0\Common\InstallRoot\Virtual"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\Common\InstallRoot\Virtual"
+
+    # Mapi Search reg
+    if ($script:KeepSku.Count -eq 0) {
+        Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Classes\CLSID\{2027FC3B-CF9D-4ec7-A823-38BA308625CC}"
     }
 
-    # Clean shell integration
-    Clean-ShellIntegration
+    # C2R keys (already removed in earlier stage, but ensure cleanup)
+    Remove-RegistryKey -Hive CurrentUser -SubKey "SOFTWARE\Microsoft\Office\15.0\ClickToRun"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\15.0\ClickToRun"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\15.0\ClickToRunStore"
+    Remove-RegistryKey -Hive CurrentUser -SubKey "SOFTWARE\Microsoft\Office\16.0\ClickToRun"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\16.0\ClickToRun"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\16.0\ClickToRunStore"
+    Remove-RegistryKey -Hive CurrentUser -SubKey "SOFTWARE\Microsoft\Office\ClickToRun"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\ClickToRun"
+    Remove-RegistryKey -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Office\ClickToRunStore"
+
+    # Office key in HKLM
+    if ($script:KeepSku.Count -eq 0) {
+        Remove-RegistryKey -Hive LocalMachine -SubKey "Software\Microsoft\Office\15.0"
+        Remove-RegistryKey -Hive LocalMachine -SubKey "Software\Microsoft\Office\16.0"
+    }
+    Clear-OfficeHKLM "SOFTWARE\Microsoft\Office"
+
+    # Run key
+    Clear-RunKeyEntries
+
+    # ARP (configuration entries already removed, clean product entries)
+    Clear-ARPEntries
+
+    # Windows Installer metadata
+    Clear-WindowsInstallerMetadata
+
+    # TypeLib cleanup
+    Clear-TypeLibRegistrations
 }
 
-function Clean-ShellIntegration {
-    Write-LogSubHeader "Cleaning shell integration"
+function Clear-OfficeHKLM {
+    param([string]$SubKey)
+    
+    # Recursively clean Office HKLM key of C2R references
+    $keys = Get-RegistryKeys -Hive LocalMachine -SubKey $SubKey
+    foreach ($key in $keys) {
+        Clear-OfficeHKLM "$SubKey\$key"
+    }
 
-    $shellKeys = @(
-        "SOFTWARE\Classes\Excel.Application",
-        "SOFTWARE\Classes\Word.Application",
-        "SOFTWARE\Classes\PowerPoint.Application",
-        "SOFTWARE\Classes\Outlook.Application",
-        "SOFTWARE\Classes\OneNote.Application"
-    )
+    # Check values
+    $values = Get-RegistryValues -Hive LocalMachine -SubKey $SubKey
+    foreach ($value in $values) {
+        $data = Get-RegistryValue -Hive LocalMachine -SubKey $SubKey -ValueName $value
+        if ($data -and (Test-IsC2R $data.ToString())) {
+            Remove-RegistryValue -Hive LocalMachine -SubKey $SubKey -ValueName $value
+        }
+    }
 
-    foreach ($key in $shellKeys) {
-        Remove-RegistryKey -Hive ClassesRoot -SubKey $key
-        Remove-RegistryKey -Hive CurrentUser -SubKey $key
-        Remove-RegistryKey -Hive LocalMachine -SubKey $key
+    # Clean empty keys
+    if (($keys.Count -eq 0 -or -not $keys) -and ($values.Count -eq 0 -or -not $values) -and ($script:KeepSku.Count -eq 0)) {
+        Remove-RegistryKey -Hive LocalMachine -SubKey $SubKey
     }
 }
 
-function Clean-OfficeShortcuts {
-    Write-LogSubHeader "Cleaning Office shortcuts"
+function Clear-RunKeyEntries {
+    $runKey = "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+    $values = Get-RegistryValues -Hive LocalMachine -SubKey $runKey
+    
+    foreach ($value in $values) {
+        $data = Get-RegistryValue -Hive LocalMachine -SubKey $runKey -ValueName $value
+        if ($data -and (Test-IsC2R $data.ToString())) {
+            Remove-RegistryValue -Hive LocalMachine -SubKey $runKey -ValueName $value
+        }
+    }
 
-    $shortcutPaths = @(
-        "$script:AllUsersProfile\Desktop",
-        "$script:AllUsersProfile\Start Menu\Programs",
-        "$env:USERPROFILE\Desktop",
-        "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\Start Menu\Programs"
-    )
+    Remove-RegistryValue -Hive LocalMachine -SubKey $runKey -ValueName "Lync15"
+    Remove-RegistryValue -Hive LocalMachine -SubKey $runKey -ValueName "Lync16"
+}
 
-    foreach ($path in $shortcutPaths) {
-        if (Test-Path $path) {
-            $shortcuts = Get-ChildItem -Path $path -Filter "*.lnk" -Recurse -ErrorAction SilentlyContinue
-            foreach ($shortcut in $shortcuts) {
-                if ($shortcut.Name -like "*Office*" -or $shortcut.Name -like "*Word*" -or $shortcut.Name -like "*Excel*" -or $shortcut.Name -like "*PowerPoint*" -or $shortcut.Name -like "*Outlook*") {
-                    Write-Log ("Removing shortcut: {0}" -f $shortcut.FullName)
-                    if (-not $script:DetectOnly) {
-                        Remove-Item -Path $shortcut.FullName -Force
-                    }
-                }
+function Clear-ARPEntries {
+    $arpKeys = Get-RegistryKeys -Hive LocalMachine -SubKey $script:REG_ARP
+    
+    foreach ($key in $arpKeys) {
+        if ($key.Length -gt 37) {
+            $guid = $key.Substring(0, 38).ToUpper()
+            if (Test-ProductInScope $guid) {
+                Remove-RegistryKey -Hive LocalMachine -SubKey "$($script:REG_ARP)$key"
             }
         }
     }
 }
 
-function Clean-OfficeServices {
-    Write-LogSubHeader "Cleaning Office services"
+# Shell integration, shortcuts, and services are now handled in their respective cleanup stages
 
-    $officeServices = @(
-        "ose",
-        "OfficeClickToRun",
-        "OfficeSvc",
-        "OfficeTelemetryAgent",
-        "OfficeTelemetryAgentFallBack"
-    )
-
-    foreach ($serviceName in $officeServices) {
-        Remove-Service -ServiceName $serviceName
-    }
-}
-
-function Clean-OfficeScheduledTasks {
-    Write-LogSubHeader "Cleaning Office scheduled tasks"
+function Remove-ScheduledTasks {
+    Write-LogSubHeader "Remove scheduled tasks"
 
     $officeTasks = @(
-        "Microsoft Office 15 Sync Maintenance for *",
-        "Microsoft Office 16 Sync Maintenance for *",
-        "Office Automatic Updates 2.0",
-        "Office ClickToRun Service Monitor",
-        "OfficeTelemetryAgent*"
+        "FF_INTEGRATEDstreamSchedule",
+        "FF_INTEGRATEDUPDATEDETECTION",
+        "C2RAppVLoggingStart",
+        "Office 15 Subscription Heartbeat",
+        "Microsoft Office 15 Sync Maintenance for {d068b555-9700-40b8-992c-f866287b06c1}",
+        "\Microsoft\Office\OfficeInventoryAgentFallBack",
+        "\Microsoft\Office\OfficeTelemetryAgentFallBack",
+        "\Microsoft\Office\OfficeInventoryAgentLogOn",
+        "\Microsoft\Office\OfficeTelemetryAgentLogOn",
+        "Office Background Streaming",
+        "\Microsoft\Office\Office Automatic Updates",
+        "\Microsoft\Office\Office ClickToRun Service Monitor",
+        "Office Subscription Maintenance"
     )
 
-    foreach ($taskPattern in $officeTasks) {
+    foreach ($taskName in $officeTasks) {
         try {
-            $tasks = Get-ScheduledTask | Where-Object { $_.TaskName -like $taskPattern }
-            foreach ($task in $tasks) {
-                Write-Log ("Removing scheduled task: {0}" -f $task.TaskName)
-                if (-not $script:DetectOnly) {
-                    Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false
-                }
+            Write-LogOnly "Removing scheduled task: $taskName"
+            if (-not $script:DetectOnly) {
+                $null = Start-Process -FilePath "schtasks.exe" -ArgumentList "/Delete", "/TN", "`"$taskName`"", "/F" `
+                    -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 500
             }
         }
         catch {
-            Write-LogOnly ("Error removing scheduled task: {0}" -f $_.Exception.Message)
+            Write-LogOnly "Error removing scheduled task $taskName : $_"
         }
     }
-}
 
-function Clean-OfficeLicensing {
-    if (-not $script:KeepLicense) {
-        Write-LogSubHeader "Cleaning Office licensing"
-
-        # Remove OSPP cache
-        $osppPaths = @(
-            "$script:ProgramData\Microsoft\OfficeSoftwareProtectionPlatform",
-            "$script:LocalAppData\Microsoft\OfficeSoftwareProtectionPlatform"
-        )
-
-        foreach ($path in $osppPaths) {
-            if (Test-Path $path) {
-                Write-Log ("Removing OSPP cache: {0}" -f $path)
-                if (-not $script:DetectOnly) {
-                    Remove-FolderRecursive -Path $path -Force
-                }
-            }
+    # Also try PowerShell cmdlets for pattern matching
+    try {
+        $tasks = Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object {
+            $_.TaskName -like "*Office*" -or $_.TaskPath -like "*\Microsoft\Office\*"
         }
 
-        # Remove VNext license cache
-        $vnextPaths = @(
-            "$script:LocalAppData\Microsoft\Office\15.0\Licensing",
-            "$script:LocalAppData\Microsoft\Office\16.0\Licensing"
-        )
-
-        foreach ($path in $vnextPaths) {
-            if (Test-Path $path) {
-                Write-Log ("Removing VNext license cache: {0}" -f $path)
+        foreach ($task in $tasks) {
+            try {
+                Write-LogOnly "Removing scheduled task (PS): $($task.TaskName)"
                 if (-not $script:DetectOnly) {
-                    Remove-FolderRecursive -Path $path -Force
+                    Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath -Confirm:$false -ErrorAction SilentlyContinue
                 }
+            }
+            catch {
+                Write-LogOnly "Error removing task $($task.TaskName): $_"
             }
         }
     }
+    catch {
+        Write-LogOnly "Error enumerating scheduled tasks: $_"
+    }
 }
+
+# License cleanup is now handled via Clear-OfficeLicenses in utilities module
 
 function Complete-Cleanup {
-    Write-LogSubHeader "Completing cleanup operations"
+    Write-LogSubHeader "Stage # 2 - CleanUp - Files"
 
-    # Clean temporary files
-    $tempPaths = @(
-        "$script:Temp\*Office*",
-        "$script:Temp\*Microsoft*",
-        "$script:WinDir\Temp\*Office*",
-        "$script:WinDir\Temp\*Microsoft*"
+    if ($script:ErrorCode -band $script:ERROR_USERCANCEL) {
+        return
+    }
+
+    Stop-OfficeProcesses
+    Remove-ScheduledTasks
+
+    # Delete Services
+    Write-LogSubHeader "Delete Services"
+    Write-Log "Delete OfficeSvc service"
+    Remove-Service -ServiceName "OfficeSvc"
+    
+    Write-Log "Delete ClickToRunSvc service"
+    Remove-Service -ServiceName "ClickToRunSvc"
+
+    # Add additional processes to termination list
+    $additionalProcesses = @("explorer.exe", "msiexec.exe", "ose.exe")
+    if ($script:Orchestrator) {
+        $terminated = $script:Orchestrator.Processes.TerminateProcesses($additionalProcesses, 5000)
+        if ($terminated.Count -gt 0) {
+            Write-LogOnly "Terminated $($terminated.Count) additional process(es)"
+        }
+    }
+
+    # Delete C2R package files and Office folders
+    Write-LogSubHeader "Delete Files and Folders"
+    
+    $fDelFolders = $false
+    $checkPaths = @(
+        "$script:ProgramFiles\Microsoft Office 15",
+        "$script:ProgramFiles\Microsoft Office 16",
+        "$script:ProgramFiles\Microsoft Office\PackageManifests"
+    )
+    
+    if ($script:Is64Bit) {
+        $checkPaths += "$script:ProgramFilesX86\Microsoft Office\PackageManifests"
+    }
+
+    foreach ($path in $checkPaths) {
+        if (Test-Path $path) {
+            $fDelFolders = $true
+            Write-Log "Attention: Now closing Explorer.exe for file delete operations"
+            Write-Log "Explorer will automatically restart."
+            Start-Sleep -Seconds 2
+            Stop-OfficeProcesses
+            break
+        }
+    }
+
+    # Delete Office folders
+    Write-LogSubHeader "Delete Office folders"
+    $officeFolders = @(
+        "$script:ProgramFiles\Microsoft Office 15",
+        "$script:ProgramFiles\Microsoft Office 16"
     )
 
-    foreach ($path in $tempPaths) {
-        $items = Get-ChildItem -Path $path -ErrorAction SilentlyContinue
-        foreach ($item in $items) {
-            Write-Log ("Removing temp item: {0}" -f $item.FullName)
-            if (-not $script:DetectOnly) {
-                Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    if ($script:Is64Bit) {
+        $officeFolders += @(
+            "$script:CommonProgramFilesX86\Microsoft Office 15",
+            "$script:CommonProgramFilesX86\Microsoft Office 16"
+        )
+    }
+
+    foreach ($folder in $officeFolders) {
+        if (Test-Path $folder) {
+            Remove-FolderRecursive -Path $folder -Force
+        }
+    }
+
+    if ($fDelFolders) {
+        $rootFolders = @(
+            "$script:ProgramFiles\Microsoft Office\PackageManifests",
+            "$script:ProgramFiles\Microsoft Office\PackageSunrisePolicies",
+            "$script:ProgramFiles\Microsoft Office\root",
+            "$script:ProgramFiles\Microsoft Office\AppXManifest.xml",
+            "$script:ProgramFiles\Microsoft Office\FileSystemMetadata.xml"
+        )
+
+        if ($script:KeepSku.Count -eq 0) {
+            $rootFolders += @(
+                "$script:ProgramFiles\Microsoft Office\Office16",
+                "$script:ProgramFiles\Microsoft Office\Office15"
+            )
+        }
+
+        if ($script:Is64Bit) {
+            $rootFolders += @(
+                "$script:ProgramFilesX86\Microsoft Office\PackageManifests",
+                "$script:ProgramFilesX86\Microsoft Office\PackageSunrisePolicies",
+                "$script:ProgramFilesX86\Microsoft Office\root",
+                "$script:ProgramFilesX86\Microsoft Office\AppXManifest.xml",
+                "$script:ProgramFilesX86\Microsoft Office\FileSystemMetadata.xml"
+            )
+
+            if ($script:KeepSku.Count -eq 0) {
+                $rootFolders += @(
+                    "$script:ProgramFilesX86\Microsoft Office\Office16",
+                    "$script:ProgramFilesX86\Microsoft Office\Office15"
+                )
+            }
+        }
+
+        foreach ($item in $rootFolders) {
+            if (Test-Path $item) {
+                if ((Get-Item $item) -is [System.IO.DirectoryInfo]) {
+                    Remove-FolderRecursive -Path $item -Force
+                }
+                else {
+                    Remove-FileForced -Path $item -ScheduleOnFail
+                }
             }
         }
     }
 
-    # Clean Windows Installer cache
-    if (Test-Path $script:WICacheDir) {
-        $wiItems = Get-ChildItem -Path $script:WICacheDir -Filter "*Office*" -ErrorAction SilentlyContinue
-        foreach ($item in $wiItems) {
-            Write-Log ("Removing WI cache item: {0}" -f $item.FullName)
-            if (-not $script:DetectOnly) {
-                Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            }
+    # Additional cleanup paths
+    $additionalPaths = @(
+        "$script:ProgramData\Microsoft\ClickToRun",
+        "$script:CommonProgramFiles\microsoft shared\ClickToRun",
+        "$script:ProgramData\Microsoft\office\FFPackageLocker",
+        "$script:ProgramData\Microsoft\office\ClickToRunPackageLocker"
+    )
+
+    foreach ($path in $additionalPaths) {
+        if (Test-Path $path) {
+            Remove-FolderRecursive -Path $path -Force
         }
     }
 
-    # Schedule deletion of in-use files
-    if (-not $script:SkipSD) {
-        Schedule-DeleteInUseFiles
+    # Check for file-based entries that need deletion
+    $fileEntries = @(
+        "$script:ProgramData\Microsoft\office\FFPackageLocker",
+        "$script:ProgramData\Microsoft\office\FFStatePBLocker"
+    )
+
+    foreach ($file in $fileEntries) {
+        if ((Test-Path $file) -and -not ((Get-Item $file -ErrorAction SilentlyContinue) -is [System.IO.DirectoryInfo])) {
+            Remove-FileForced -Path $file -ScheduleOnFail
+        }
+    }
+
+    if ($script:KeepSku.Count -eq 0) {
+        Remove-FolderRecursive -Path "$script:ProgramData\Microsoft\office\Heartbeat" -Force
+    }
+
+    # User profile folders
+    $userProfilePaths = @(
+        "$env:USERPROFILE\Microsoft Office",
+        "$env:USERPROFILE\Microsoft Office 15",
+        "$env:USERPROFILE\Microsoft Office 16"
+    )
+
+    foreach ($path in $userProfilePaths) {
+        if (Test-Path $path) {
+            Remove-FolderRecursive -Path $path -Force
+        }
+    }
+
+    # Restore explorer
+    if ($script:Orchestrator) {
+        Write-Log "Restoring Explorer..."
+        $script:Orchestrator.Shell.RestartExplorer()
+    }
+
+    # Delete shortcuts
+    Write-LogSubHeader "Search and delete shortcuts"
+    Clear-Shortcuts -RootPath $script:AllUsersProfile -Delete
+    if (Test-Path "$env:SystemDrive\Users") {
+        Clear-Shortcuts -RootPath "$env:SystemDrive\Users" -Delete
+    }
+
+    # Delete empty folders
+    Remove-EmptyFolders
+
+    # Add pending deletes to registry if any
+    if ($script:DelInUse.Count -gt 0) {
+        Write-LogSubHeader "Add $($script:DelInUse.Count) PendingFileRenameOperations"
+        foreach ($path in $script:DelInUse.Keys) {
+            Write-LogOnly "   $path"
+            $script:Orchestrator.Registry.AddPendingFileRenameOperation($path)
+        }
     }
 }
 
-function Schedule-DeleteInUseFiles {
-    Write-LogSubHeader "Scheduling deletion of in-use files"
+function Remove-EmptyFolders {
+    $foldersToCheck = @(
+        "$script:CommonProgramFiles\Microsoft Shared\Office15",
+        "$script:CommonProgramFiles\Microsoft Shared\Office16",
+        "$script:CommonProgramFiles\Microsoft Shared",
+        "$script:ProgramFiles\Microsoft Office\Office15",
+        "$script:ProgramFiles\Microsoft Office\Office16"
+    )
 
-    # This would implement the logic to schedule files for deletion on reboot
-    # For now, we'll just log the action
-    Write-Log "Files scheduled for deletion on reboot (if any)"
+    foreach ($folder in $foldersToCheck) {
+        if ((Test-Path $folder) -and (Get-ChildItem $folder -Force | Measure-Object).Count -eq 0) {
+            Write-LogOnly "Removing empty folder: $folder"
+            if (-not $script:DetectOnly) {
+                Remove-Item $folder -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
 }
+
+# Schedule-DeleteInUseFiles is handled in Complete-Cleanup via PendingFileRenameOperations
 
 function Show-Summary {
-    Write-LogHeader "Cleanup Summary"
+    Write-LogHeader "Stage # 3 - Exit"
 
-    if ($script:DetectOnly) {
-        Write-Log ("DETECT ONLY MODE - No files were removed")
+    # Update return value
+    Set-ReturnValue $script:ErrorCode
+
+    # Log detailed results
+    if ($script:ErrorCode -band $script:ERROR_INCOMPLETE) {
+        Write-LogSubHeader ("Removal result: {0} - INCOMPLETE. Uninstall requires a system reboot to complete." -f $script:ErrorCode)
     }
     else {
-        Write-Log ("Office C2R removal completed")
+        $status = " - SUCCESS"
+        if ($script:ErrorCode -band $script:ERROR_USERCANCEL) { $status = " - USER CANCELED" }
+        if ($script:ErrorCode -band $script:ERROR_FAIL) { $status = " - FAIL" }
+        Write-LogSubHeader ("Removal result: {0}{1}" -f $script:ErrorCode, $status)
     }
 
+    # Log individual error flags
+    if ($script:ErrorCode -band $script:ERROR_FAIL) {
+        if ($script:ErrorCode -band $script:ERROR_REBOOT_REQUIRED) { Write-Log " - Reboot required" }
+        if ($script:ErrorCode -band $script:ERROR_USERCANCEL) { Write-Log " - User cancel" }
+        if ($script:ErrorCode -band $script:ERROR_STAGE1) { Write-Log " - Msiexec failed" }
+        if ($script:ErrorCode -band $script:ERROR_STAGE2) { Write-Log " - Cleanup failed" }
+        if ($script:ErrorCode -band $script:ERROR_INCOMPLETE) { Write-Log " - Removal incomplete. Rerun after reboot needed" }
+        if ($script:ErrorCode -band $script:ERROR_DCAF_FAILURE) { Write-Log " - Second attempt cleanup still incomplete" }
+        if ($script:ErrorCode -band $script:ERROR_ELEVATION_USERDECLINED) { Write-Log " - User declined elevation" }
+        if ($script:ErrorCode -band $script:ERROR_ELEVATION) { Write-Log " - Elevation failed" }
+        if ($script:ErrorCode -band $script:ERROR_SCRIPTINIT) { Write-Log " - Initialization error" }
+        if ($script:ErrorCode -band $script:ERROR_RELAUNCH) { Write-Log " - Unhandled error during relaunch attempt" }
+        if ($script:ErrorCode -band $script:ERROR_UNKNOWN) { Write-Log " - Unknown error" }
+    }
+
+    Write-LogSubHeader "Removal end."
+
+    # Reboot handling
     if ($script:RebootRequired) {
-        Write-Log ("REBOOT REQUIRED - Please restart the system")
-        Set-ErrorCode $script:ERROR_REBOOT_REQUIRED
+        Write-Log ""
+        Write-Log "===================================================================="
+        Write-Log "REBOOT REQUIRED - System restart needed to complete uninstall"
+        Write-Log "===================================================================="
+        
+        if (-not $script:Quiet) {
+            $response = Read-Host "Do you want to reboot now? (Y/N)"
+            if ($response -match "^[Yy]") {
+                Write-Log "Initiating system reboot..."
+                Restart-Computer -Force
+            }
+        }
     }
 
-    Write-Log ("Final error code: {0}" -f $script:ErrorCode)
-
-    # Set return value
-    Set-ReturnValue $script:ErrorCode
+    Write-Log ("Final exit code: {0}" -f $script:ErrorCode)
 }
 
 #endregion
@@ -743,40 +929,64 @@ function Show-Summary {
 function Main {
     try {
         # Initialize script
+        Write-LogHeader "Initialization"
         if (-not (Initialize-Script)) {
             return $script:ERROR_SCRIPTINIT
         }
 
+        # Clear init error on success
+        Clear-ErrorCode $script:ERROR_SCRIPTINIT
+
+        #-----------------------------
+        # Stage # 0 - Basic detection
+        #-----------------------------
+        Write-LogHeader "Stage # 0 - Basic detection"
+
         # Find installed Office products
         if (-not (Find-InstalledOfficeProducts)) {
             Write-Log ("No Office products found to remove")
+            Show-Summary
             return $script:ERROR_SUCCESS
         }
 
         if ($script:DetectOnly) {
             Write-Log ("Detection complete - no removal performed")
+            Show-Summary
             return $script:ERROR_SUCCESS
         }
 
-        # Confirm removal unless forced
-        if (-not $script:Force) {
+        # Confirm removal unless forced or quiet
+        if (-not $script:Force -and -not $script:Quiet) {
             $confirmation = Read-Host ("Are you sure you want to remove all Office C2R products? (Y/N)")
             if ($confirmation -notmatch "^[Yy]") {
                 Write-Log ("User cancelled removal")
                 Set-ErrorCode $script:ERROR_USERCANCEL
+                Show-Summary
                 return $script:ERROR_USERCANCEL
             }
         }
 
-        # Perform removal operations
+        #-----------------------
+        # Stage # 1 - Uninstall
+        #-----------------------
         Uninstall-OfficeProducts
-        Remove-OfficeFiles
+
+        #---------------------
+        # Stage # 2 - CleanUp
+        #---------------------
+        # Registry cleanup
         Clean-OfficeRegistry
-        Clean-OfficeShortcuts
-        Clean-OfficeServices
-        Clean-OfficeScheduledTasks
-        Clean-OfficeLicensing
+
+        # File cleanup
         Complete-Cleanup
+
+        #------------------
+        # Stage # 3 - Exit
+        #------------------
+        # Ensure Explorer is running
+        if ($script:Orchestrator) {
+            $script:Orchestrator.Shell.RestartExplorer()
+        }
 
         # Show summary
         Show-Summary
@@ -785,8 +995,14 @@ function Main {
     }
     catch {
         Write-Log ("Fatal error: {0}" -f $_.Exception.Message)
+        Write-LogOnly ("Stack trace: {0}" -f $_.ScriptStackTrace)
         Set-ErrorCode $script:ERROR_UNKNOWN
+        Show-Summary
         return $script:ERROR_UNKNOWN
+    }
+    finally {
+        # Always close log
+        Close-Log
     }
 }
 
