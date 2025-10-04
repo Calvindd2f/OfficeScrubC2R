@@ -4,11 +4,11 @@ Complete PowerShell/C# implementation of Microsoft's OffScrubC2R.vbs (v2.19) wit
 
 ## Features
 
-✅ **Full VBS Compatibility** - All 3,803 lines of VBS functionality ported  
-✅ **High Performance** - C# inline code for registry, file, and process operations  
-✅ **Modern Error Handling** - Comprehensive logging and error codes  
-✅ **Type Safety** - Strongly-typed C# helpers  
-✅ **Parallel Processing** - Multi-threaded operations where beneficial  
+✅ **Full VBS Compatibility** - All 3,803 lines of VBS functionality ported
+✅ **High Performance** - C# inline code for registry, file, and process operations
+✅ **Modern Error Handling** - Comprehensive logging and error codes
+✅ **Type Safety** - Strongly-typed C# helpers
+✅ **Parallel Processing** - Multi-threaded operations where beneficial
 
 ## Requirements
 
@@ -214,22 +214,22 @@ Check `%TEMP%\OfficeScrubC2R\` for detailed logs.
 
 ## What Gets Removed
 
-✅ Office 2013/2016/365 C2R installations  
-✅ ClickToRun components  
-✅ Integration components  
-✅ Scheduled tasks  
-✅ Services (OfficeSvc, ClickToRunSvc)  
-✅ Registry keys (C2R, WI metadata, TypeLibs)  
-✅ Shortcuts (with unpinning)  
-✅ License cache (optional)  
+✅ Office 2013/2016/365 C2R installations
+✅ ClickToRun components
+✅ Integration components
+✅ Scheduled tasks
+✅ Services (OfficeSvc, ClickToRunSvc)
+✅ Registry keys (C2R, WI metadata, TypeLibs)
+✅ Shortcuts (with unpinning)
+✅ License cache (optional)
 
 ## What Gets Preserved
 
-✅ User documents  
-✅ Outlook PST/OST files  
-✅ Custom templates  
-✅ Add-ins (non-Office locations)  
-✅ Non-C2R Office installations  
+✅ User documents
+✅ Outlook PST/OST files
+✅ Custom templates
+✅ Add-ins (non-Office locations)
+✅ Non-C2R Office installations
 
 ## Known Limitations
 
