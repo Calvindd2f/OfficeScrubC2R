@@ -299,7 +299,18 @@ namespace OfficeScrubNative
                 }
 
                 var decoded = sb.ToString();
-                decodedGuid = $"{{{decoded.Substring(0, 8)}-{decoded.Substring(12, 4)}-{decoded.Substring(8, 4)}-{decoded.Substring(22, 2)}{decoded.Substring(20, 2)}-{decoded.Substring(18, 2)}{decoded.Substring(16, 2)}{decoded.Substring(30, 2)}{decoded.Substring(28, 2)}{decoded.Substring(26, 2)}{decoded.Substring(24, 2)}}}";
+                decodedGuid = string.Format("{{{0}-{1}-{2}-{3}{4}-{5}{6}{7}{8}{9}{10}}}",
+                    decoded.Substring(0, 8),
+                    decoded.Substring(12, 4),
+                    decoded.Substring(8, 4),
+                    decoded.Substring(22, 2),
+                    decoded.Substring(20, 2),
+                    decoded.Substring(18, 2),
+                    decoded.Substring(16, 2),
+                    decoded.Substring(30, 2),
+                    decoded.Substring(28, 2),
+                    decoded.Substring(26, 2),
+                    decoded.Substring(24, 2));
                 return true;
             }
             catch
@@ -650,7 +661,7 @@ namespace OfficeScrubNative
                 var psi = new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/c rd /s /q \"{directoryPath}\"",
+                    Arguments = string.Format("/c rd /s /q \"{0}\"", directoryPath),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -993,7 +1004,7 @@ namespace OfficeScrubNative
                         var guid = GuidHelper.GetExpandedGuid(key);
                         if (guid != null && shouldDelete(guid))
                         {
-                            _regHelper.DeleteKey(RegistryHiveType.LocalMachine, $"{path}\\{key}");
+                            _regHelper.DeleteKey(RegistryHiveType.LocalMachine, string.Format("{0}\\{1}", path, key));
                         }
                     }
                 }
@@ -1021,7 +1032,7 @@ namespace OfficeScrubNative
                         var guid = GuidHelper.GetExpandedGuid(key);
                         if (guid != null && shouldDelete(guid))
                         {
-                            _regHelper.DeleteKey(hive, $"{path}\\{key}");
+                            _regHelper.DeleteKey(hive, string.Format("{0}\\{1}", path, key));
                         }
                     }
                 }
@@ -1038,7 +1049,7 @@ namespace OfficeScrubNative
                 if (component.Length == 32)
                 {
                     var values = _regHelper.EnumerateValues(RegistryHiveType.LocalMachine,
-                        $"{componentPath}\\{component}");
+                        string.Format("{0}\\{1}", componentPath, component));
 
                     foreach (var value in values)
                     {
@@ -1048,7 +1059,7 @@ namespace OfficeScrubNative
                             if (guid != null && shouldDelete(guid))
                             {
                                 _regHelper.DeleteValue(RegistryHiveType.LocalMachine,
-                                    $"{componentPath}\\{component}", value);
+                                    string.Format("{0}\\{1}", componentPath, component), value);
                             }
                         }
                     }
@@ -1066,12 +1077,12 @@ namespace OfficeScrubNative
                 if (component.Length == 32)
                 {
                     var values = _regHelper.EnumerateValues(RegistryHiveType.ClassesRoot,
-                        $"{componentPath}\\{component}");
+                        string.Format("{0}\\{1}", componentPath, component));
 
                     foreach (var value in values)
                     {
                         var data = _regHelper.GetValue(RegistryHiveType.ClassesRoot,
-                            $"{componentPath}\\{component}", value) as string[];
+                            string.Format("{0}\\{1}", componentPath, component), value) as string[];
 
                         if (data != null)
                         {
@@ -1083,7 +1094,8 @@ namespace OfficeScrubNative
                                 if (item.Length > 20)
                                 {
                                     var encoded = item.Substring(0, 20);
-                                    if (GuidHelper.GetDecodedGuid(encoded, out string guid))
+                                    string guid;
+                                    if (GuidHelper.GetDecodedGuid(encoded, out guid))
                                     {
                                         if (shouldDelete(guid))
                                         {
@@ -1100,12 +1112,12 @@ namespace OfficeScrubNative
                                 if (newData.Count == 0)
                                 {
                                     _regHelper.DeleteValue(RegistryHiveType.ClassesRoot,
-                                        $"{componentPath}\\{component}", value);
+                                        string.Format("{0}\\{1}", componentPath, component), value);
                                 }
                                 else
                                 {
                                     _regHelper.SetValue(RegistryHiveType.ClassesRoot,
-                                        $"{componentPath}\\{component}", value,
+                                        string.Format("{0}\\{1}", componentPath, component), value,
                                         newData.ToArray(), RegistryValueKind.MultiString);
                                 }
                             }
@@ -1150,7 +1162,7 @@ namespace OfficeScrubNative
 
             foreach (var typeLib in KnownTypeLibs)
             {
-                var tlKey = $"{typeLibPath}\\{typeLib}";
+                var tlKey = string.Format("{0}\\{1}", typeLibPath, typeLib);
                 if (!_regHelper.KeyExists(RegistryHiveType.LocalMachine, tlKey))
                     continue;
 
@@ -1159,12 +1171,12 @@ namespace OfficeScrubNative
                 foreach (var version in versions)
                 {
                     bool canDelete = true;
-                    var versionKey = $"{tlKey}\\{version}";
+                    var versionKey = string.Format("{0}\\{1}", tlKey, version);
 
                     // Check Win32 and Win64 paths
                     foreach (var platform in new[] { "0\\Win32", "9\\Win32", "0\\Win64", "9\\Win64" })
                     {
-                        var platformKey = $"{versionKey}\\{platform}";
+                        var platformKey = string.Format("{0}\\{1}", versionKey, platform);
                         var filePath = _regHelper.GetValue(RegistryHiveType.LocalMachine,
                             platformKey, "", null) as string;
 
@@ -1213,9 +1225,10 @@ namespace OfficeScrubNative
                 scope.Connect();
 
                 var className = versionNT > 601 ? "SoftwareLicensingProduct" : "OfficeSoftwareProtectionProduct";
-                var query = new SelectQuery(
-                    $"SELECT ID, ApplicationId, PartialProductKey, Name, ProductKeyID FROM {className} " +
-                    $"WHERE ApplicationId = '{officeAppId}' AND PartialProductKey <> NULL");
+                var queryString = string.Format(
+                    "SELECT ID, ApplicationId, PartialProductKey, Name, ProductKeyID FROM {0} WHERE ApplicationId = '{1}' AND PartialProductKey <> NULL",
+                    className, officeAppId);
+                var query = new SelectQuery(queryString);
 
                 using (var searcher = new ManagementObjectSearcher(scope, query))
                 {
@@ -1275,7 +1288,8 @@ namespace OfficeScrubNative
                 var scope = new ManagementScope("\\\\.\\root\\cimv2");
                 scope.Connect();
 
-                var query = new SelectQuery($"SELECT * FROM Win32_Service WHERE Name LIKE '{serviceName}%'");
+                var queryString = string.Format("SELECT * FROM Win32_Service WHERE Name LIKE '{0}%'", serviceName);
+                var query = new SelectQuery(queryString);
 
                 using (var searcher = new ManagementObjectSearcher(scope, query))
                 {
@@ -1312,7 +1326,7 @@ namespace OfficeScrubNative
                     var psi = new ProcessStartInfo
                     {
                         FileName = "sc.exe",
-                        Arguments = $"delete {serviceName}",
+                        Arguments = string.Format("delete {0}", serviceName),
                         UseShellExecute = false,
                         CreateNoWindow = true
                     };
@@ -1337,14 +1351,14 @@ namespace OfficeScrubNative
 
     public class OfficeScrubOrchestrator
     {
-        public RegistryHelper Registry { get; }
-        public FileHelper Files { get; }
-        public ProcessHelper Processes { get; }
-        public ShellHelper Shell { get; }
-        public WindowsInstallerHelper WindowsInstaller { get; }
-        public TypeLibHelper TypeLib { get; }
-        public LicenseHelper License { get; }
-        public ServiceHelper Services { get; }
+        public RegistryHelper Registry { get; private set; }
+        public FileHelper Files { get; private set; }
+        public ProcessHelper Processes { get; private set; }
+        public ShellHelper Shell { get; private set; }
+        public WindowsInstallerHelper WindowsInstaller { get; private set; }
+        public TypeLibHelper TypeLib { get; private set; }
+        public LicenseHelper License { get; private set; }
+        public ServiceHelper Services { get; private set; }
 
         public OfficeScrubOrchestrator(bool is64Bit)
         {
@@ -1379,7 +1393,8 @@ namespace OfficeScrubNative
                 return false;
 
             // Check version
-            if (!int.TryParse(upper.Substring(3, 2), out int version) || version <= 14)
+            int version;
+            if (!int.TryParse(upper.Substring(3, 2), out version) || version <= 14)
                 return false;
 
             // Check SKU
@@ -1394,6 +1409,4 @@ namespace OfficeScrubNative
     }
 
     #endregion
-}
-    }
 }

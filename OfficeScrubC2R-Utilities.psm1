@@ -63,7 +63,6 @@ $script:Orchestrator = $null
 
 function Initialize-NativeTypes {
     $csharpPath = Join-Path $PSScriptRoot "OfficeScrubC2R-Native.cs"
-    
     if (-not (Test-Path $csharpPath)) {
         throw "C# helper file not found: $csharpPath"
     }
@@ -71,12 +70,39 @@ function Initialize-NativeTypes {
     $csharpCode = Get-Content $csharpPath -Raw
 
     try {
-        Add-Type -TypeDefinition $csharpCode -Language CSharp `
-            -ReferencedAssemblies @(
-                "System.Management",
+        # For Windows PowerShell 5.1 (.NET Framework), use simpler assembly references
+        # For PowerShell 7+ (.NET Core), we would need more specific assemblies
+        if ($PSVersionTable.PSVersion.Major -ge 6) {
+            # PowerShell 7+ (.NET Core)
+            $assemblies = @(
+                "System",
                 "System.Core",
+                "System.Collections",
+                "System.Linq",
+                "System.Management",
+                "System.Threading.Thread",
+                "System.ComponentModel.Primitives",
+                "System.Diagnostics.Process",
+                "System.IO.FileSystem",
+                "System.Runtime",
+                "Microsoft.CSharp",
+                "Microsoft.Win32.Registry",
+                "mscorlib",
+                "netstandard"
+            )
+        }
+        else {
+            # Windows PowerShell 5.1 (.NET Framework) - much simpler!
+            $assemblies = @(
+                "System",
+                "System.Core",
+                "System.Management",
                 "Microsoft.CSharp"
-            ) -ErrorAction Stop
+            )
+        }
+        
+        Add-Type -TypeDefinition $csharpCode -Language CSharp `
+            -ReferencedAssemblies $assemblies -ErrorAction Stop
 
         Write-Verbose "Native C# types loaded successfully"
     }
@@ -123,7 +149,7 @@ function Initialize-Environment {
 
     $script:WICacheDir = Join-Path $script:WinDir "Installer"
     $script:ScrubDir = Join-Path $script:Temp $script:SCRIPT_NAME
-    
+
     if (-not (Test-Path $script:ScrubDir)) {
         New-Item -Path $script:ScrubDir -ItemType Directory -Force | Out-Null
     }
@@ -260,9 +286,9 @@ function Set-ErrorCode {
     $script:ErrorCode = $script:ErrorCode -bor $ErrorBit
 
     # Cascade critical errors to FAIL bit
-    $criticalErrors = $script:ERROR_DCAF_FAILURE -bor $script:ERROR_STAGE2 -bor 
-                     $script:ERROR_ELEVATION_USERDECLINED -bor $script:ERROR_ELEVATION -bor 
-                     $script:ERROR_SCRIPTINIT
+    $criticalErrors = $script:ERROR_DCAF_FAILURE -bor $script:ERROR_STAGE2 -bor
+    $script:ERROR_ELEVATION_USERDECLINED -bor $script:ERROR_ELEVATION -bor
+    $script:ERROR_SCRIPTINIT
 
     if ($script:ErrorCode -band $criticalErrors) {
         $script:ErrorCode = $script:ErrorCode -bor $script:ERROR_FAIL
@@ -276,8 +302,8 @@ function Clear-ErrorCode {
     $script:ErrorCode = $script:ErrorCode -band (-bnot $ErrorBit)
 
     # Clear FAIL bit if clearing critical errors
-    $clearableErrors = $script:ERROR_ELEVATION_USERDECLINED -bor $script:ERROR_ELEVATION -bor 
-                      $script:ERROR_SCRIPTINIT
+    $clearableErrors = $script:ERROR_ELEVATION_USERDECLINED -bor $script:ERROR_ELEVATION -bor
+    $script:ERROR_SCRIPTINIT
 
     if ($ErrorBit -band $clearableErrors) {
         $script:ErrorCode = $script:ErrorCode -band (-bnot $script:ERROR_FAIL)
@@ -289,7 +315,7 @@ function Set-ReturnValue {
     param([int]$Value)
 
     $retValFile = Join-Path $script:ScrubDir "ScrubRetValFile.txt"
-    
+
     try {
         [System.IO.File]::WriteAllText($retValFile, $Value.ToString())
     }
@@ -411,13 +437,13 @@ function Remove-FolderRecursive {
     if (-not $script:DetectOnly) {
         Write-LogOnly "Delete folder: $Path"
         $result = $script:Orchestrator.Files.DeleteDirectory($Path, $true, $true)
-        
+
         if (-not $result) {
             Write-Log "Failed to delete folder, scheduled for reboot: $Path"
             $script:RebootRequired = $true
             Set-ErrorCode $script:ERROR_REBOOT_REQUIRED
         }
-        
+
         return $result
     }
     else {
@@ -440,13 +466,13 @@ function Remove-FileForced {
     if (-not $script:DetectOnly) {
         Write-LogOnly "Delete file: $Path"
         $result = $script:Orchestrator.Files.DeleteFile($Path, $ScheduleOnFail)
-        
+
         if (-not $result -and $ScheduleOnFail) {
             Write-Log "Failed to delete file, scheduled for reboot: $Path"
             $script:RebootRequired = $true
             Set-ErrorCode $script:ERROR_REBOOT_REQUIRED
         }
-        
+
         return $result
     }
     else {
@@ -516,7 +542,7 @@ function Get-InstalledOfficeProducts {
             $version = Get-RegistryValue -Hive LocalMachine `
                 -SubKey "SOFTWARE\Microsoft\Office\15.0\ClickToRun\ProductReleaseIDs\Active\culture" `
                 -ValueName "x-none"
-            
+
             $products[$prod.ToLower()] = $version
             $script:C2RSuite[$prod] = "$prod - $version"
         }
@@ -614,10 +640,10 @@ function Get-InstalledOfficeProducts {
             -SubKey "$($script:REG_ARP)$arpKey" `
             -ValueName "UninstallString"
 
-        if ($uninstallString -and 
-            (($uninstallString -like "*Microsoft Office 1*") -or 
-             ($uninstallString -like "*OfficeClickToRun.exe*"))) {
-            
+        if ($uninstallString -and
+            (($uninstallString -like "*Microsoft Office 1*") -or
+            ($uninstallString -like "*OfficeClickToRun.exe*"))) {
+
             $displayVersion = Get-RegistryValue -Hive LocalMachine `
                 -SubKey "$($script:REG_ARP)$arpKey" `
                 -ValueName "DisplayVersion"
@@ -625,7 +651,7 @@ function Get-InstalledOfficeProducts {
             # Extract product ID from uninstall string
             if ($uninstallString -match "productstoremove=([^\s]+)") {
                 $prod = $matches[1] -replace "_.*", "" -replace "\.1.*", ""
-                
+
                 Write-LogOnly "Found C2R product in ARP: $prod"
                 if (-not $products.ContainsKey($prod.ToLower())) {
                     $products[$prod.ToLower()] = $displayVersion
@@ -698,7 +724,7 @@ function Clear-OfficeLicenses {
     Write-Log "Cleaning OSPP licenses..."
     $osVersion = [Environment]::OSVersion.Version
     $versionNT = $osVersion.Major * 100 + $osVersion.Minor
-    
+
     if (-not $script:DetectOnly) {
         $script:Orchestrator.License.CleanOSPP($versionNT)
     }
@@ -879,7 +905,7 @@ function Clear-Shortcuts {
         try {
             $shell = New-Object -ComObject WScript.Shell
             $link = $shell.CreateShortcut($shortcut.FullName)
-            
+
             $shouldDelete = $false
 
             # Check if target is C2R-related
