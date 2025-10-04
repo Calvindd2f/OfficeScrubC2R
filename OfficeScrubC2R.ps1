@@ -1,5 +1,5 @@
 # OfficeScrubC2R.ps1
-# High-performance Office Click-to-Run removal script
+# Office Click-to-Run removal script
 # Converted from VBS with C# optimizations for better performance
 
 <#
@@ -8,7 +8,7 @@
 
 .DESCRIPTION
     This script provides comprehensive removal of Office 2013, 2016, and O365 C2R products
-    using high-performance C# inline code for registry and file operations.
+    using C# inline code for registry and file operations.
 
 .PARAMETER Quiet
     Run in quiet mode with minimal output.

@@ -1,6 +1,6 @@
 # OfficeScrubC2R-Utilities.psm1
 # High-performance utility functions for Office C2R removal
-# Uses C# inline code for performance-critical operations
+# Uses C# for performance-critical operations
 
 using namespace System
 using namespace System.Collections.Generic
@@ -202,6 +202,97 @@ public class ProcessManager
         bool result = TerminateProcess(hProcess, 0);
         CloseHandle(hProcess);
         return result;
+    }
+}
+
+public class GuidDecoder
+{
+    // Base85 decoding table (ASCII character to value mapping)
+    private static readonly byte[] DecodeTable = new byte[256];
+
+    static GuidDecoder()
+    {
+        // Initialize decode table with 0xff (invalid) for all characters
+        for (int i = 0; i < 256; i++)
+        {
+            DecodeTable[i] = 0xff;
+        }
+
+        // Set valid Base85 character mappings
+        byte[] validChars = { 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124 };
+        byte[] values = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0xff, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0xff, 0xff, 0xff, 0x16, 0xff, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0xff, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0xff, 0x53, 0x54, 0xff };
+
+        for (int i = 0; i < validChars.Length && i < values.Length; i++)
+        {
+            DecodeTable[validChars[i]] = values[i];
+        }
+    }
+
+    public static string DecodeGuid(string encodedGuid)
+    {
+        if (string.IsNullOrEmpty(encodedGuid))
+            return null;
+
+        try
+        {
+            bool failed = false;
+            uint total = 0;
+            uint pow85 = 1;
+            var decode = new System.Text.StringBuilder();
+
+            int maxLength = Math.Min(encodedGuid.Length, 20);
+
+            for (int i = 0; i < maxLength; i++)
+            {
+                failed = true;
+
+                if (i % 5 == 0)
+                {
+                    total = 0;
+                    pow85 = 1;
+                }
+
+                int charCode = (int)encodedGuid[i];
+
+                if (charCode >= 128 || DecodeTable[charCode] == 0xff)
+                {
+                    break;
+                }
+
+                uint hexValue = DecodeTable[charCode];
+                total += hexValue * pow85;
+
+                if (i % 5 == 4)
+                {
+                    decode.Append(total.ToString("X8"));
+                }
+
+                pow85 *= 85;
+                failed = false;
+            }
+
+            if (!failed && decode.Length >= 32)
+            {
+                string decodedString = decode.ToString();
+
+                // Reconstruct GUID in the specific order from the VBScript
+                return "{" +
+                       decodedString.Substring(0, 8) + "-" +
+                       decodedString.Substring(12, 4) + "-" +
+                       decodedString.Substring(8, 4) + "-" +
+                       decodedString.Substring(22, 2) + decodedString.Substring(20, 2) + "-" +
+                       decodedString.Substring(18, 2) + decodedString.Substring(16, 2) +
+                       decodedString.Substring(30, 2) + decodedString.Substring(28, 2) +
+                       decodedString.Substring(26, 2) + decodedString.Substring(24, 2) +
+                       "}";
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 "@
@@ -854,7 +945,8 @@ function Get-ReturnValueFromFile {
             $reader = [System.IO.StreamReader]::new($retValPath)
             try {
                 $content = $reader.ReadToEnd()
-            } finally {
+            }
+            finally {
                 $reader.Close()
             }
             return [int]$content
@@ -892,9 +984,21 @@ function Get-DecodedGuid {
         [string]$Guid
     )
 
-    # This is a simplified version - the original VBS had complex GUID decoding logic
-    # For most cases, we can use the standard GUID format
-    return Get-ExpandedGuid $Guid
+    try {
+        # Use C# for GUID decoding
+        $decodedGuid = [GuidDecoder]::DecodeGuid($EncGuid)
+
+        if ($decodedGuid) {
+            return $decodedGuid
+        }
+
+        # Fallback to expanded GUID format if decoding fails
+        return Get-ExpandedGuid $Guid
+    }
+    catch {
+        Write-Log "Failed to decode GUID: $($_.Exception.Message)"
+        return Get-ExpandedGuid $Guid
+    }
 }
 #endregion
 
