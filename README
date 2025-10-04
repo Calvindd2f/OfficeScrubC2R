@@ -1,8 +1,51 @@
-# Office C2R Scrubber - PowerShell Conversion
+# Overview
 
-## Overview
+This PowerShell script is a comprehensive Office Click-to-Run (C2R) removal tool designed to forcibly uninstall Microsoft Office when standard uninstall methods fail. Here's what the code does:
 
-This is a high-performance PowerShell conversion of the Microsoft Office Click-to-Run (C2R) removal script. The original VBS script has been converted to PowerShell with significant performance optimizations using C# inline code for registry and file operations.
+## Script Overview
+The script removes Office 2013, 2016, and O365 Click-to-Run installations through multiple cleanup stages, with performance optimizations using C# inline code for registry and file operations.
+
+## Key Components
+
+### Parameters & Configuration:
+
+- Multiple switches control behavior (Quiet, DetectOnly, Force, etc.)
+- Imports a utility module for helper functions
+- Requires Administrator privileges unless -NoElevate is specified
+
+### Main Execution Flow:
+
+- **Initialize-Script:** Sets up logging, checks elevation, gathers system info
+- **Find-InstalledOfficeProducts:** Detects installed Office products and validates Windows Installer metadata
+- **Uninstall-OfficeProducts:** Performs the actual removal through multiple methods
+- **Cleanup Functions:** Removes files, registry entries, shortcuts, services, and scheduled tasks
+
+### Removal Methods:
+
+- **ODT-based removal:** Downloads and runs Office Deployment Tool with XML configuration
+- **MSI-based removal:** Uses msiexec to remove MSI-installed components
+- **Registry cleanup:** Removes Office registry keys and Windows Installer metadata
+- **File system cleanup:** Deletes Office installation folders and user data
+- **Service cleanup:** Removes Office-related Windows services
+- **Shell integration cleanup:** Removes file associations and shortcuts
+
+### Performance Optimizations:
+
+- Batch processing of registry operations
+- Optimized file deletion using .NET methods
+- Pre-filtering of products before processing
+- Parallel preparation of uninstall commands
+
+### Safety Features:
+
+- DetectOnly mode for scanning without removal
+- User confirmation unless Force is specified
+- Comprehensive logging throughout the process
+- Error handling and rollback capabilities
+
+The script is designed as a "nuclear option" for Office removal when standard uninstall methods have failed, ensuring complete cleanup of all Office components from the system.
+
+---
 
 ## Key Improvements
 

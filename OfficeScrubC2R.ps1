@@ -80,7 +80,7 @@ Import-Module -Name (Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1") -F
 #region Main Script Functions
 
 function Initialize-Script {
-    Write-LogHeader "Office C2R Scrubber v$script:SCRIPT_VERSION - Initialization"
+    Write-LogHeader ("Office C2R Scrubber v{0} - Initialization" -f $script:SCRIPT_VERSION)
 
     # Set script parameters
     $script:Quiet = $Quiet
@@ -120,9 +120,9 @@ function Initialize-Script {
         Initialize-Log $script:LogDir
     }
 
-    Write-Log "System Information: $script:OSInfo"
-    Write-Log "64-bit System: $script:Is64Bit"
-    Write-Log "Elevated: $script:IsElevated"
+    Write-Log ("System Information: {0}" -f $script:OSInfo)
+    Write-Log ("64-bit System: {0}" -f $script:Is64Bit)
+    Write-Log ("Elevated: {0}" -f $script:IsElevated)
 
     return $true
 }
@@ -144,7 +144,7 @@ function Find-InstalledOfficeProducts {
     if ($script:C2RSuite.Count -gt 0) {
         Write-Log "Registered ARP product(s) found:"
         foreach ($key in $script:C2RSuite.Keys) {
-            Write-Log " - $key - $($script:C2RSuite[$key])"
+            Write-Log (" - {0} - {1}" -f $key, $script:C2RSuite[$key])
         }
     }
     else {
@@ -185,31 +185,31 @@ function Uninstall-OfficeProducts {
 
     # Check OSE service state
     Write-LogSubHeader "Check state of OSE service"
-    $oseServices = Get-WmiObject -Class Win32_Service -Filter "Name like 'ose%'"
+    $oseServices = Get-CimInstance -ClassName Win32_Service -Filter "Name LIKE 'ose%'"
     foreach ($service in $oseServices) {
         if ($service.StartMode -eq "Disabled") {
-            Write-Log "Conflict detected: OSE service is disabled"
-            $service.ChangeStartMode("Manual") | Out-Null
+            Write-Log ("Conflict detected: OSE service is disabled" -f $service.StartMode)
+            [void]($service.ChangeStartMode("Manual"))
         }
         if ($service.StartName -ne "LocalSystem") {
-            Write-Log "Conflict detected: OSE service not running as LocalSystem"
-            $service.Change($null, $null, $null, $null, $null, $null, "LocalSystem", "") | Out-Null
+            Write-Log ("Conflict detected: OSE service not running as LocalSystem" -f $service.StartName)
+            [void]($service.Change($null, $null, $null, $null, $null, $null, "LocalSystem", ""))
         }
     }
 
     if ($script:C2RSuite.Count -eq 0) {
-        Write-Log "No uninstallable C2R items registered in Uninstall"
+        Write-Log ("No uninstallable C2R items registered in Uninstall: {0}" -f $script:C2RSuite.Count)
     }
 
     # Call ODT-based uninstall
     Uninstall-OfficeC2R
 
     # Remove published component registration
-    Write-LogSubHeader "Remove published component registration for C2R packages"
+    Write-LogSubHeader ("Remove published component registration for C2R packages: {0}" -f $script:C2RSuite.Count)
     Remove-PublishedComponents
 
     # Remove C2R and App-V registry data
-    Write-LogSubHeader "Remove C2R and App-V registry data"
+    Write-LogSubHeader ("Remove C2R and App-V registry data: {0}" -f $script:C2RSuite.Count)
     Remove-C2RRegistryData
 
     # MSI-based uninstall
@@ -217,7 +217,7 @@ function Uninstall-OfficeProducts {
 }
 
 function Uninstall-OfficeC2R {
-    Write-LogSubHeader "Uninstalling Office C2R using ODT"
+    Write-LogSubHeader ("Uninstalling Office C2R using ODT: {0}" -f $script:C2RSuite.Count)
 
     # Build removal XML
     $removeXml = Build-RemoveXml
@@ -231,13 +231,16 @@ function Uninstall-OfficeC2R {
         if (Download-ODT -Url "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD18-4A8E-8E0B-75C0FEC274F4/OfficeDeploymentTool_12325-20288.exe" -LocalPath $odtPath) {
             $odtArgs = "/configure `"$configPath`""
             if ($script:Quiet) {
-                $odtArgs += " /quiet"
+                if (-not ($odtArgs -is [System.Collections.Generic.List[string]])) {
+                    $odtArgs = [System.Collections.Generic.List[string]]@($odtArgs)
+                }
+                $odtArgs.Add("/quiet")
             }
 
-            Write-Log "Running ODT: $odtPath $odtArgs"
+            Write-Log ("Running ODT: {0} {1}" -f $odtPath, $odtArgs)
             if (-not $script:DetectOnly) {
                 $result = Start-Process -FilePath $odtPath -ArgumentList $odtArgs -Wait -PassThru
-                Write-Log "ODT returned: $($result.ExitCode)"
+                Write-Log ("ODT returned: {0}" -f $result.ExitCode)
 
                 if ($result.ExitCode -eq 3010) {
                     $script:RebootRequired = $true
@@ -267,14 +270,14 @@ function Download-ODT {
     )
 
     try {
-        Write-Log "Downloading ODT from: $Url"
+        Write-Log ("Downloading ODT from: {0}" -f $Url)
         if (-not $script:DetectOnly) {
             Invoke-WebRequest -Uri $Url -OutFile $LocalPath -UseBasicParsing
         }
         return $true
     }
     catch {
-        Write-Log "Failed to download ODT: $($_.Exception.Message)"
+        Write-Log ("Failed to download ODT: {0}" -f $_.Exception.Message)
         return $false
     }
 }
@@ -286,30 +289,59 @@ function Remove-PublishedComponents {
         @{ Version = "Current"; Key = "SOFTWARE\Microsoft\Office\ClickToRun" }
     )
 
+    # Optimize by collecting all manifest files in one go and using array operations
+    $allManifestFiles = @()
+    $integratorTasks = @()
+
     foreach ($pkg in $packageFolders) {
         $packageFolder = Get-RegistryValue -Hive LocalMachine -SubKey $pkg.Key -ValueName "PackageFolder"
         $packageGuid = Get-RegistryValue -Hive LocalMachine -SubKey $pkg.Key -ValueName "PackageGUID"
 
-        if ($packageFolder -and (Test-Path "$packageFolder\root\Integration")) {
-            # Delete manifest files
-            $manifestFiles = Get-ChildItem -Path "$packageFolder\root\Integration" -Filter "C2RManifest*.xml" -ErrorAction SilentlyContinue
-            foreach ($file in $manifestFiles) {
-                Write-Log "Deleting manifest file: $($file.FullName)"
-                if (-not $script:DetectOnly) {
-                    Remove-Item -Path $file.FullName -Force
-                }
+        $integrationPath = "$packageFolder\root\Integration"
+        if ($packageFolder -and (Test-Path $integrationPath)) {
+            # Collect manifest files for batch processing
+            $manifestFiles = Get-ChildItem -Path $integrationPath -Filter "C2RManifest*.xml" -ErrorAction SilentlyContinue
+            if ($manifestFiles) {
+                $allManifestFiles += $manifestFiles
             }
 
-            # Run integrator.exe
-            $integratorPath = "$packageFolder\root\Integration\integrator.exe"
+            # Prepare integrator tasks for later execution
+            $integratorPath = "$integrationPath\integrator.exe"
             if (Test-Path $integratorPath) {
                 $integratorArgs = "/U /Extension PackageRoot=`"$packageFolder\root`" PackageGUID=$packageGuid"
-                Write-Log "Running integrator: $integratorPath $integratorArgs"
-                if (-not $script:DetectOnly) {
-                    $result = Start-Process -FilePath $integratorPath -ArgumentList $integratorArgs -Wait -PassThru
-                    Write-Log "Integrator returned: $($result.ExitCode)"
+                $integratorTasks += [PSCustomObject]@{
+                    Path = $integratorPath
+                    Args = $integratorArgs
                 }
             }
+        }
+    }
+
+    # Delete all manifest files in one go using .NET methods for speed
+    if ($allManifestFiles.Count -gt 0) {
+        $filePaths = $allManifestFiles | ForEach-Object { $_.FullName }
+        Write-Log ("Deleting {0} manifest files..." -f $filePaths.Count)
+        foreach ($filePath in $filePaths) {
+            Write-Log ("Deleting manifest file: {0}" -f $filePath)
+        }
+        if (-not $script:DetectOnly) {
+            # Use [System.IO.File]::Delete for performance
+            foreach ($filePath in $filePaths) {
+                try {
+                    [System.IO.File]::Delete($filePath)
+                } catch {
+                    Write-Log ("Failed to delete manifest file: {0} - {1}" -f $filePath, $_.Exception.Message)
+                }
+            }
+        }
+    }
+
+    # Run all integrator tasks
+    foreach ($task in $integratorTasks) {
+        Write-Log ("Running integrator: {0} {1}" -f $task.Path, $task.Args)
+        if (-not $script:DetectOnly) {
+            $result = Start-Process -FilePath $task.Path -ArgumentList $task.Args -Wait -PassThru
+            Write-Log ("Integrator returned: {0}" -f $result.ExitCode)
         }
     }
 }
@@ -362,36 +394,55 @@ function Uninstall-MSIProducts {
         $msi = New-Object -ComObject WindowsInstaller.Installer
         $products = $msi.Products
 
+        # Optimize by filtering in-scope products first, then process in batch
+        $inScopeProducts = @()
+        $outOfScopeProducts = @()
+
         foreach ($product in $products) {
             if (Test-ProductInScope $product) {
-                Write-Log "Call msiexec.exe to remove $product"
-                $uninstallCmd = "msiexec.exe /x$product REBOOT=ReallySuppress NOREMOVESPAWN=True"
+                $inScopeProducts += $product
+            } else {
+                $outOfScopeProducts += $product
+            }
+        }
 
-                if ($script:Quiet) {
-                    $uninstallCmd += " /q"
-                }
-                else {
-                    $uninstallCmd += " /qb-!"
-                }
+        if ($outOfScopeProducts.Count -gt 0) {
+            $outOfScopeProducts | ForEach-Object { Write-LogOnly "Skip out of scope product: $_" }
+        }
 
+        if ($inScopeProducts.Count -gt 0) {
+            # Prepare msiexec commands and log files in advance
+            $msiexecArgsList = @()
+            foreach ($product in $inScopeProducts) {
+                Write-Log ("Call msiexec.exe to remove {0}" -f $product)
                 $logFile = Join-Path $script:LogDir "Uninstall_$product.log"
-                $uninstallCmd += " /l*v `"$logFile`""
+                $args = @("/x$product", "REBOOT=ReallySuppress", "NOREMOVESPAWN=True")
+                if ($script:Quiet) {
+                    $args += "/q"
+                } else {
+                    $args += "/qb-!"
+                }
+                $args += "/l*v"
+                $args += "`"$logFile`""
+                $msiexecArgsList += ,@($product, $args, $logFile)
+                Write-LogOnly "Call msiexec with 'msiexec.exe $($args -join ' ')'"
+            }
 
-                Stop-OfficeProcesses
-                Write-LogOnly "Call msiexec with '$uninstallCmd'"
+            Stop-OfficeProcesses
 
-                if (-not $script:DetectOnly) {
-                    $result = Start-Process -FilePath "msiexec.exe" -ArgumentList "/x$product", "REBOOT=ReallySuppress", "NOREMOVESPAWN=True", "/q", "/l*v", "`"$logFile`"" -Wait -PassThru
-                    Write-Log "msiexec returned: $($result.ExitCode)"
+            if (-not $script:DetectOnly) {
+                foreach ($item in $msiexecArgsList) {
+                    $product = $item[0]
+                    $args = $item[1]
+                    $logFile = $item[2]
+                    $result = Start-Process -FilePath "msiexec.exe" -ArgumentList $args -Wait -PassThru
+                    Write-Log ("msiexec returned: {0}" -f $result.ExitCode)
 
                     if ($result.ExitCode -eq 3010) {
                         $script:RebootRequired = $true
                         Set-ErrorCode $script:ERROR_REBOOT_REQUIRED
                     }
                 }
-            }
-            else {
-                Write-LogOnly "Skip out of scope product: $product"
             }
         }
 
@@ -401,7 +452,7 @@ function Uninstall-MSIProducts {
         }
     }
     catch {
-        Write-Log "Error during MSI uninstall: $($_.Exception.Message)"
+        Write-Log ("Error during MSI uninstall: {0}" -f $_.Exception.Message)
         Set-ErrorCode $script:ERROR_STAGE1
     }
 }
@@ -443,7 +494,7 @@ function Remove-OfficeFiles {
 
     foreach ($path in $officePaths) {
         if (Test-Path $path) {
-            Write-Log "Removing Office path: $path"
+            Write-Log ("Removing Office path: {0}" -f $path)
             if (-not $script:DetectOnly) {
                 Remove-FolderRecursive -Path $path -Force
             }
@@ -467,7 +518,7 @@ function Remove-UserOfficeData {
 
     foreach ($path in $userPaths) {
         if (Test-Path $path) {
-            Write-Log "Removing user Office data: $path"
+            Write-Log ("Removing user Office data: {0}" -f $path)
             if (-not $script:DetectOnly) {
                 Remove-FolderRecursive -Path $path -Force
             }
@@ -529,7 +580,7 @@ function Clean-OfficeShortcuts {
             $shortcuts = Get-ChildItem -Path $path -Filter "*.lnk" -Recurse -ErrorAction SilentlyContinue
             foreach ($shortcut in $shortcuts) {
                 if ($shortcut.Name -like "*Office*" -or $shortcut.Name -like "*Word*" -or $shortcut.Name -like "*Excel*" -or $shortcut.Name -like "*PowerPoint*" -or $shortcut.Name -like "*Outlook*") {
-                    Write-Log "Removing shortcut: $($shortcut.FullName)"
+                    Write-Log ("Removing shortcut: {0}" -f $shortcut.FullName)
                     if (-not $script:DetectOnly) {
                         Remove-Item -Path $shortcut.FullName -Force
                     }
@@ -570,14 +621,14 @@ function Clean-OfficeScheduledTasks {
         try {
             $tasks = Get-ScheduledTask | Where-Object { $_.TaskName -like $taskPattern }
             foreach ($task in $tasks) {
-                Write-Log "Removing scheduled task: $($task.TaskName)"
+                Write-Log ("Removing scheduled task: {0}" -f $task.TaskName)
                 if (-not $script:DetectOnly) {
                     Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false
                 }
             }
         }
         catch {
-            Write-LogOnly "Error removing scheduled task: $($_.Exception.Message)"
+            Write-LogOnly ("Error removing scheduled task: {0}" -f $_.Exception.Message)
         }
     }
 }
@@ -594,7 +645,7 @@ function Clean-OfficeLicensing {
 
         foreach ($path in $osppPaths) {
             if (Test-Path $path) {
-                Write-Log "Removing OSPP cache: $path"
+                Write-Log ("Removing OSPP cache: {0}" -f $path)
                 if (-not $script:DetectOnly) {
                     Remove-FolderRecursive -Path $path -Force
                 }
@@ -609,7 +660,7 @@ function Clean-OfficeLicensing {
 
         foreach ($path in $vnextPaths) {
             if (Test-Path $path) {
-                Write-Log "Removing VNext license cache: $path"
+                Write-Log ("Removing VNext license cache: {0}" -f $path)
                 if (-not $script:DetectOnly) {
                     Remove-FolderRecursive -Path $path -Force
                 }
@@ -632,7 +683,7 @@ function Complete-Cleanup {
     foreach ($path in $tempPaths) {
         $items = Get-ChildItem -Path $path -ErrorAction SilentlyContinue
         foreach ($item in $items) {
-            Write-Log "Removing temp item: $($item.FullName)"
+            Write-Log ("Removing temp item: {0}" -f $item.FullName)
             if (-not $script:DetectOnly) {
                 Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
             }
@@ -643,7 +694,7 @@ function Complete-Cleanup {
     if (Test-Path $script:WICacheDir) {
         $wiItems = Get-ChildItem -Path $script:WICacheDir -Filter "*Office*" -ErrorAction SilentlyContinue
         foreach ($item in $wiItems) {
-            Write-Log "Removing WI cache item: $($item.FullName)"
+            Write-Log ("Removing WI cache item: {0}" -f $item.FullName)
             if (-not $script:DetectOnly) {
                 Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
             }
@@ -668,18 +719,18 @@ function Show-Summary {
     Write-LogHeader "Cleanup Summary"
 
     if ($script:DetectOnly) {
-        Write-Log "DETECT ONLY MODE - No files were removed"
+        Write-Log ("DETECT ONLY MODE - No files were removed")
     }
     else {
-        Write-Log "Office C2R removal completed"
+        Write-Log ("Office C2R removal completed")
     }
 
     if ($script:RebootRequired) {
-        Write-Log "REBOOT REQUIRED - Please restart the system"
+        Write-Log ("REBOOT REQUIRED - Please restart the system")
         Set-ErrorCode $script:ERROR_REBOOT_REQUIRED
     }
 
-    Write-Log "Final error code: $script:ErrorCode"
+    Write-Log ("Final error code: {0}" -f $script:ErrorCode)
 
     # Set return value
     Set-ReturnValue $script:ErrorCode
@@ -698,20 +749,20 @@ function Main {
 
         # Find installed Office products
         if (-not (Find-InstalledOfficeProducts)) {
-            Write-Log "No Office products found to remove"
+            Write-Log ("No Office products found to remove")
             return $script:ERROR_SUCCESS
         }
 
         if ($script:DetectOnly) {
-            Write-Log "Detection complete - no removal performed"
+            Write-Log ("Detection complete - no removal performed")
             return $script:ERROR_SUCCESS
         }
 
         # Confirm removal unless forced
         if (-not $script:Force) {
-            $confirmation = Read-Host "Are you sure you want to remove all Office C2R products? (Y/N)"
+            $confirmation = Read-Host ("Are you sure you want to remove all Office C2R products? (Y/N)")
             if ($confirmation -notmatch "^[Yy]") {
-                Write-Log "User cancelled removal"
+                Write-Log ("User cancelled removal")
                 Set-ErrorCode $script:ERROR_USERCANCEL
                 return $script:ERROR_USERCANCEL
             }
@@ -733,7 +784,7 @@ function Main {
         return $script:ErrorCode
     }
     catch {
-        Write-Log "Fatal error: $($_.Exception.Message)"
+        Write-Log ("Fatal error: {0}" -f $_.Exception.Message)
         Set-ErrorCode $script:ERROR_UNKNOWN
         return $script:ERROR_UNKNOWN
     }
