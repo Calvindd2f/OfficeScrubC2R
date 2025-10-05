@@ -206,7 +206,7 @@ function Invoke-OfficeScrubC2R {
         # Cleanup is handled by the main script
     }
 }
-
+[void](Initialize-Environment)
 # Export module members
 Export-ModuleMember -Function @(
     'Invoke-OfficeScrubC2R',
