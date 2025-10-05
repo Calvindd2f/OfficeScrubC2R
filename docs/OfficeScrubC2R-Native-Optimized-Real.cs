@@ -33,6 +33,7 @@ namespace OfficeScrubNative
         public const int SQUISHED = 20;
         public const int COMPRESSED = 32;
 
+        // Keep as array - only used with .Any() which doesn't benefit from HashSet
         public static readonly string[] C2R_PATTERNS = new[]
         {
             @"\ROOT\OFFICE1",
@@ -170,6 +171,20 @@ namespace OfficeScrubNative
 
     public static class GuidHelper
     {
+        // OPTIMIZATION: Static decode table - allocate once instead of per call
+        private static readonly byte[] DecodeTable = new byte[128]
+        {
+            0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+            0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+            0xff,0x00,0xff,0xff,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0xff,
+            0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14,0x15,0xff,0xff,0xff,0x16,0xff,0x17,
+            0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,
+            0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,0x30,0x31,0x32,0x33,0xff,0x34,0x35,0x36,
+            0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x40,0x41,0x42,0x43,0x44,0x45,0x46,
+            0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,0x50,0x51,0x52,0xff,0x53,0x54,0xff
+        };
+
+        // OPTIMIZATION: Use Span<char> to avoid StringBuilder allocations
         public static string GetExpandedGuid(string compressedGuid)
         {
             if (string.IsNullOrEmpty(compressedGuid) || compressedGuid.Length != 32)
@@ -177,35 +192,31 @@ namespace OfficeScrubNative
 
             try
             {
-                var sb = new StringBuilder(38);
-                sb.Append('{');
-                sb.Append(Reverse(compressedGuid.Substring(0, 8)));
-                sb.Append('-');
-                sb.Append(Reverse(compressedGuid.Substring(8, 4)));
-                sb.Append('-');
-                sb.Append(Reverse(compressedGuid.Substring(12, 4)));
-                sb.Append('-');
+                Span<char> result = stackalloc char[38];
+                result[0] = '{';
+                result[9] = '-';
+                result[14] = '-';
+                result[19] = '-';
+                result[24] = '-';
+                result[37] = '}';
 
-                for (int i = 16; i < 20; i++)
+                ReverseToSpan(compressedGuid.AsSpan(0, 8), result.Slice(1, 8));
+                ReverseToSpan(compressedGuid.AsSpan(8, 4), result.Slice(10, 4));
+                ReverseToSpan(compressedGuid.AsSpan(12, 4), result.Slice(15, 4));
+
+                for (int i = 0; i < 4; i += 2)
                 {
-                    if (i % 2 == 0)
-                        sb.Append(compressedGuid[i + 1]);
-                    else
-                        sb.Append(compressedGuid[i - 1]);
+                    result[20 + i] = compressedGuid[17 + i];
+                    result[21 + i] = compressedGuid[16 + i];
                 }
 
-                sb.Append('-');
-
-                for (int i = 20; i < 32; i++)
+                for (int i = 0; i < 12; i += 2)
                 {
-                    if (i % 2 == 0)
-                        sb.Append(compressedGuid[i + 1]);
-                    else
-                        sb.Append(compressedGuid[i - 1]);
+                    result[25 + i] = compressedGuid[21 + i];
+                    result[26 + i] = compressedGuid[20 + i];
                 }
 
-                sb.Append('}');
-                return sb.ToString().ToUpperInvariant();
+                return new string(result).ToUpperInvariant();
             }
             catch
             {
@@ -213,6 +224,7 @@ namespace OfficeScrubNative
             }
         }
 
+        // OPTIMIZATION: Use Span<char> to avoid StringBuilder allocations
         public static string GetCompressedGuid(string expandedGuid)
         {
             if (string.IsNullOrEmpty(expandedGuid) || expandedGuid.Length != 38)
@@ -220,31 +232,26 @@ namespace OfficeScrubNative
 
             try
             {
-                var guid = expandedGuid.Trim('{', '}');
-                var parts = guid.Split('-');
+                ReadOnlySpan<char> guid = expandedGuid.AsSpan(1, 36);
+                Span<char> result = stackalloc char[32];
 
-                var sb = new StringBuilder(32);
-                sb.Append(Reverse(parts[0]));
-                sb.Append(Reverse(parts[1]));
-                sb.Append(Reverse(parts[2]));
+                ReverseToSpan(guid.Slice(0, 8), result.Slice(0, 8));
+                ReverseToSpan(guid.Slice(9, 4), result.Slice(8, 4));
+                ReverseToSpan(guid.Slice(14, 4), result.Slice(12, 4));
 
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < 4; i += 2)
                 {
-                    if (i % 2 == 0)
-                        sb.Append(parts[3][i + 1]);
-                    else
-                        sb.Append(parts[3][i - 1]);
+                    result[16 + i] = guid[20 + i + 1];
+                    result[17 + i] = guid[20 + i];
                 }
 
-                for (int i = 0; i < 12; i++)
+                for (int i = 0; i < 12; i += 2)
                 {
-                    if (i % 2 == 0)
-                        sb.Append(parts[4][i - 1]);
-                    else
-                        sb.Append(parts[4][i + 1]);
+                    result[20 + i] = guid[25 + i + 1];
+                    result[21 + i] = guid[25 + i];
                 }
 
-                return sb.ToString().ToUpperInvariant();
+                return new string(result).ToUpperInvariant();
             }
             catch
             {
@@ -252,6 +259,7 @@ namespace OfficeScrubNative
             }
         }
 
+        // OPTIMIZATION: Use Span<char> and static DecodeTable
         public static bool GetDecodedGuid(string encodedGuid, out string decodedGuid)
         {
             decodedGuid = null;
@@ -261,21 +269,10 @@ namespace OfficeScrubNative
 
             try
             {
-                var table = new byte[]
-                {
-                    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-                    0xff,0x00,0xff,0xff,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0xff,
-                    0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14,0x15,0xff,0xff,0xff,0x16,0xff,0x17,
-                    0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,
-                    0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,0x30,0x31,0x32,0x33,0xff,0x34,0x35,0x36,
-                    0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x40,0x41,0x42,0x43,0x44,0x45,0x46,
-                    0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,0x50,0x51,0x52,0xff,0x53,0x54,0xff
-                };
-
-                var sb = new StringBuilder();
+                Span<char> decoded = stackalloc char[32];
                 long total = 0;
                 long pow85 = 1;
+                int pos = 0;
 
                 for (int i = 0; i < 20; i++)
                 {
@@ -286,37 +283,44 @@ namespace OfficeScrubNative
                     }
 
                     int ascii = encodedGuid[i];
-                    if (ascii >= 128 || table[ascii] == 0xff)
+                    if (ascii >= 128 || DecodeTable[ascii] == 0xff)
                         return false;
 
-                    int chr = table[ascii];
-                    total += chr * pow85;
+                    total += DecodeTable[ascii] * pow85;
 
                     if (i % 5 == 4)
-                        sb.Append(total.ToString("X8"));
+                    {
+                        total.TryFormat(decoded.Slice(pos, 8), out _, "X8");
+                        pos += 8;
+                    }
 
                     pow85 *= 85;
                 }
 
-                var decoded = sb.ToString();
                 decodedGuid = string.Format("{{{0}-{1}-{2}-{3}{4}-{5}{6}{7}{8}{9}{10}}}",
-                    decoded.Substring(0, 8),
-                    decoded.Substring(12, 4),
-                    decoded.Substring(8, 4),
-                    decoded.Substring(22, 2),
-                    decoded.Substring(20, 2),
-                    decoded.Substring(18, 2),
-                    decoded.Substring(16, 2),
-                    decoded.Substring(30, 2),
-                    decoded.Substring(28, 2),
-                    decoded.Substring(26, 2),
-                    decoded.Substring(24, 2));
+                    new string(decoded.Slice(0, 8)),
+                    new string(decoded.Slice(12, 4)),
+                    new string(decoded.Slice(8, 4)),
+                    new string(decoded.Slice(22, 2)),
+                    new string(decoded.Slice(20, 2)),
+                    new string(decoded.Slice(18, 2)),
+                    new string(decoded.Slice(16, 2)),
+                    new string(decoded.Slice(30, 2)),
+                    new string(decoded.Slice(28, 2)),
+                    new string(decoded.Slice(26, 2)),
+                    new string(decoded.Slice(24, 2)));
                 return true;
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static void ReverseToSpan(ReadOnlySpan<char> source, Span<char> destination)
+        {
+            for (int i = 0; i < source.Length; i++)
+                destination[i] = source[source.Length - 1 - i];
         }
 
         private static string Reverse(string s)
@@ -342,22 +346,24 @@ namespace OfficeScrubNative
 
         public bool KeyExists(RegistryHiveType hive, string subKey)
         {
-            return KeyExistsInternal(GetHiveKey(hive), subKey, false) ||
-                   (_is64Bit && KeyExistsInternal(GetHiveKey(hive), GetWow64Key(subKey), false));
+            var hiveKey = GetHiveKey(hive);
+            return KeyExistsInternal(hiveKey, subKey) ||
+                   (_is64Bit && KeyExistsInternal(hiveKey, GetWow64Key(subKey)));
         }
 
         public bool DeleteKey(RegistryHiveType hive, string subKey, bool recursive = true)
         {
+            var hiveKey = GetHiveKey(hive);
             bool result = false;
 
             if (KeyExists(hive, subKey))
             {
-                result = DeleteKeyInternal(GetHiveKey(hive), subKey, recursive);
+                result = DeleteKeyInternal(hiveKey, subKey, recursive);
             }
 
             if (_is64Bit && KeyExists(hive, GetWow64Key(subKey)))
             {
-                result = DeleteKeyInternal(GetHiveKey(hive), GetWow64Key(subKey), recursive) || result;
+                result = DeleteKeyInternal(hiveKey, GetWow64Key(subKey), recursive) || result;
             }
 
             return result;
@@ -402,103 +408,77 @@ namespace OfficeScrubNative
         public string[] EnumerateKeys(RegistryHiveType hive, string subKey)
         {
             var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var hiveKey = GetHiveKey(hive);
 
+            AddKeysFromPath(hiveKey, subKey, keys);
+            if (_is64Bit)
+                AddKeysFromPath(hiveKey, GetWow64Key(subKey), keys);
+
+            return keys.ToArray();
+        }
+
+        private void AddKeysFromPath(RegistryKey hiveKey, string subKey, HashSet<string> keys)
+        {
             try
             {
-                using (var key = OpenKey(GetHiveKey(hive), subKey, false))
+                using var key = hiveKey.OpenSubKey(subKey, false);
+                if (key != null)
                 {
-                    if (key != null)
-                    {
-                        foreach (var name in key.GetSubKeyNames())
-                            keys.Add(name);
-                    }
+                    foreach (var name in key.GetSubKeyNames())
+                        keys.Add(name);
                 }
             }
             catch { }
-
-            if (_is64Bit)
-            {
-                try
-                {
-                    using (var key = OpenKey(GetHiveKey(hive), GetWow64Key(subKey), false))
-                    {
-                        if (key != null)
-                        {
-                            foreach (var name in key.GetSubKeyNames())
-                                keys.Add(name);
-                        }
-                    }
-                }
-                catch { }
-            }
-
-            return keys.ToArray();
         }
 
         public string[] EnumerateValues(RegistryHiveType hive, string subKey)
         {
             var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var hiveKey = GetHiveKey(hive);
 
-            try
-            {
-                using (var key = OpenKey(GetHiveKey(hive), subKey, false))
-                {
-                    if (key != null)
-                    {
-                        foreach (var name in key.GetValueNames())
-                            values.Add(name);
-                    }
-                }
-            }
-            catch { }
-
+            AddValuesFromPath(hiveKey, subKey, values);
             if (_is64Bit)
-            {
-                try
-                {
-                    using (var key = OpenKey(GetHiveKey(hive), GetWow64Key(subKey), false))
-                    {
-                        if (key != null)
-                        {
-                            foreach (var name in key.GetValueNames())
-                                values.Add(name);
-                        }
-                    }
-                }
-                catch { }
-            }
+                AddValuesFromPath(hiveKey, GetWow64Key(subKey), values);
 
             return values.ToArray();
         }
 
-        public object GetValue(RegistryHiveType hive, string subKey, string valueName, object defaultValue = null)
+        private void AddValuesFromPath(RegistryKey hiveKey, string subKey, HashSet<string> values)
         {
-            object result = null;
-
             try
             {
-                using (var key = OpenKey(GetHiveKey(hive), subKey, false))
+                using var key = hiveKey.OpenSubKey(subKey, false);
+                if (key != null)
                 {
-                    if (key != null)
-                        result = key.GetValue(valueName, defaultValue);
+                    foreach (var name in key.GetValueNames())
+                        values.Add(name);
                 }
             }
             catch { }
+        }
+
+        public object GetValue(RegistryHiveType hive, string subKey, string valueName, object defaultValue = null)
+        {
+            var hiveKey = GetHiveKey(hive);
+            object result = GetValueFromPath(hiveKey, subKey, valueName, defaultValue);
 
             if (result == null && _is64Bit)
-            {
-                try
-                {
-                    using (var key = OpenKey(GetHiveKey(hive), GetWow64Key(subKey), false))
-                    {
-                        if (key != null)
-                            result = key.GetValue(valueName, defaultValue);
-                    }
-                }
-                catch { }
-            }
+                result = GetValueFromPath(hiveKey, GetWow64Key(subKey), valueName, defaultValue);
 
             return result ?? defaultValue;
+        }
+
+        private object GetValueFromPath(RegistryKey hiveKey, string subKey, string valueName, object defaultValue)
+        {
+            try
+            {
+                using var key = hiveKey.OpenSubKey(subKey, false);
+                return key?.GetValue(valueName, defaultValue);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public bool SetValue(RegistryHiveType hive, string subKey, string valueName, object value, RegistryValueKind kind)
@@ -520,14 +500,12 @@ namespace OfficeScrubNative
             return false;
         }
 
-        private bool KeyExistsInternal(RegistryKey hive, string subKey, bool writable)
+        private bool KeyExistsInternal(RegistryKey hive, string subKey)
         {
             try
             {
-                using (var key = hive.OpenSubKey(subKey, writable))
-                {
-                    return key != null;
-                }
+                using var key = hive.OpenSubKey(subKey, false);
+                return key != null;
             }
             catch
             {
@@ -563,22 +541,15 @@ namespace OfficeScrubNative
             }
         }
 
-        private RegistryKey GetHiveKey(RegistryHiveType hive)
+        // OPTIMIZATION: Use switch expression
+        private RegistryKey GetHiveKey(RegistryHiveType hive) => hive switch
         {
-            switch (hive)
-            {
-                case RegistryHiveType.ClassesRoot:
-                    return Registry.ClassesRoot;
-                case RegistryHiveType.CurrentUser:
-                    return Registry.CurrentUser;
-                case RegistryHiveType.LocalMachine:
-                    return Registry.LocalMachine;
-                case RegistryHiveType.Users:
-                    return Registry.Users;
-                default:
-                    throw new ArgumentException("Invalid hive type");
-            }
-        }
+            RegistryHiveType.ClassesRoot => Registry.ClassesRoot,
+            RegistryHiveType.CurrentUser => Registry.CurrentUser,
+            RegistryHiveType.LocalMachine => Registry.LocalMachine,
+            RegistryHiveType.Users => Registry.Users,
+            _ => throw new ArgumentException("Invalid hive type")
+        };
 
         private string GetWow64Key(string subKey)
         {
@@ -604,7 +575,7 @@ namespace OfficeScrubNative
                     if (key != null)
                     {
                         var existing = key.GetValue(valueName) as string[];
-                        var list = new List<string>(existing ?? new string[0]);
+                        var list = new List<string>(existing ?? Array.Empty<string>());
                         list.Add("\\??\\" + filePath);
                         list.Add(string.Empty);
                         key.SetValue(valueName, list.ToArray(), RegistryValueKind.MultiString);
@@ -630,7 +601,6 @@ namespace OfficeScrubNative
 
             try
             {
-                // Remove read-only attribute
                 var attrs = File.GetAttributes(filePath);
                 if ((attrs & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
                 {
@@ -663,7 +633,9 @@ namespace OfficeScrubNative
                     FileName = "cmd.exe",
                     Arguments = $"/c rd /s /q \"{directoryPath}\"",
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
                 }))
                 {
                     process.WaitForExit(30000);
@@ -779,7 +751,8 @@ namespace OfficeScrubNative
 
             foreach (var processName in processNames)
             {
-                var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(processName));
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(processName);
+                var processes = Process.GetProcessesByName(nameWithoutExt);
 
                 foreach (var process in processes)
                 {
@@ -809,7 +782,9 @@ namespace OfficeScrubNative
                 }
             }
 
-            Task.WaitAll(tasks.ToArray(), timeoutMs * 2);
+            if (tasks.Count > 0)
+                Task.WaitAll(tasks.ToArray(), timeoutMs * 2);
+
             return terminatedPids;
         }
 
@@ -841,13 +816,15 @@ namespace OfficeScrubNative
             return processes;
         }
 
+        // OPTIMIZATION: Proper disposal of Process objects
         public bool IsProcessRunning(string processName)
         {
             try
             {
                 var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(processName));
                 var hasRunning = processes.Length > 0;
-                foreach (var p in processes) p.Dispose();
+                foreach (var p in processes)
+                    p.Dispose();
                 return hasRunning;
             }
             catch
@@ -988,23 +965,17 @@ namespace OfficeScrubNative
 
         public void CleanupUpgradeCodes(Func<string, bool> shouldDelete)
         {
-            var upgradePaths = new[]
-            {
-                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UpgradeCodes"
-            };
+            const string path = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UpgradeCodes";
 
-            foreach (var path in upgradePaths)
+            var keys = _regHelper.EnumerateKeys(RegistryHiveType.LocalMachine, path);
+            foreach (var key in keys)
             {
-                var keys = _regHelper.EnumerateKeys(RegistryHiveType.LocalMachine, path);
-                foreach (var key in keys)
+                if (key.Length == 32)
                 {
-                    if (key.Length == 32)
+                    var guid = GuidHelper.GetExpandedGuid(key);
+                    if (guid != null && shouldDelete(guid))
                     {
-                        var guid = GuidHelper.GetExpandedGuid(key);
-                        if (guid != null && shouldDelete(guid))
-                        {
-                            _regHelper.DeleteKey(RegistryHiveType.LocalMachine, string.Format("{0}\\{1}", path, key));
-                        }
+                        _regHelper.DeleteKey(RegistryHiveType.LocalMachine, $"{path}\\{key}");
                     }
                 }
             }
@@ -1014,15 +985,12 @@ namespace OfficeScrubNative
         {
             var productPaths = new[]
             {
-                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\S-1-5-18\\Products",
-                "Installer\\Products"
+                ("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\S-1-5-18\\Products", RegistryHiveType.LocalMachine),
+                ("Installer\\Products", RegistryHiveType.ClassesRoot)
             };
 
-            foreach (var path in productPaths)
+            foreach (var (path, hive) in productPaths)
             {
-                var hive = path.StartsWith("Installer") ?
-                    RegistryHiveType.ClassesRoot : RegistryHiveType.LocalMachine;
-
                 var keys = _regHelper.EnumerateKeys(hive, path);
                 foreach (var key in keys)
                 {
@@ -1031,7 +999,7 @@ namespace OfficeScrubNative
                         var guid = GuidHelper.GetExpandedGuid(key);
                         if (guid != null && shouldDelete(guid))
                         {
-                            _regHelper.DeleteKey(hive, string.Format("{0}\\{1}", path, key));
+                            _regHelper.DeleteKey(hive, $"{path}\\{key}");
                         }
                     }
                 }
@@ -1040,7 +1008,7 @@ namespace OfficeScrubNative
 
         public void CleanupComponents(Func<string, bool> shouldDelete)
         {
-            var componentPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\S-1-5-18\\Components";
+            const string componentPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Installer\\UserData\\S-1-5-18\\Components";
 
             var components = _regHelper.EnumerateKeys(RegistryHiveType.LocalMachine, componentPath);
             foreach (var component in components)
@@ -1048,7 +1016,7 @@ namespace OfficeScrubNative
                 if (component.Length == 32)
                 {
                     var values = _regHelper.EnumerateValues(RegistryHiveType.LocalMachine,
-                        string.Format("{0}\\{1}", componentPath, component));
+                        $"{componentPath}\\{component}");
 
                     foreach (var value in values)
                     {
@@ -1058,7 +1026,7 @@ namespace OfficeScrubNative
                             if (guid != null && shouldDelete(guid))
                             {
                                 _regHelper.DeleteValue(RegistryHiveType.LocalMachine,
-                                    string.Format("{0}\\{1}", componentPath, component), value);
+                                    $"{componentPath}\\{component}", value);
                             }
                         }
                     }
@@ -1068,7 +1036,7 @@ namespace OfficeScrubNative
 
         public void CleanupPublishedComponents(Func<string, bool> shouldDelete)
         {
-            var componentPath = "Installer\\Components";
+            const string componentPath = "Installer\\Components";
 
             var components = _regHelper.EnumerateKeys(RegistryHiveType.ClassesRoot, componentPath);
             foreach (var component in components)
@@ -1076,12 +1044,12 @@ namespace OfficeScrubNative
                 if (component.Length == 32)
                 {
                     var values = _regHelper.EnumerateValues(RegistryHiveType.ClassesRoot,
-                        string.Format("{0}\\{1}", componentPath, component));
+                        $"{componentPath}\\{component}");
 
                     foreach (var value in values)
                     {
                         var data = _regHelper.GetValue(RegistryHiveType.ClassesRoot,
-                            string.Format("{0}\\{1}", componentPath, component), value) as string[];
+                            $"{componentPath}\\{component}", value) as string[];
 
                         if (data != null)
                         {
@@ -1093,8 +1061,7 @@ namespace OfficeScrubNative
                                 if (item.Length > 20)
                                 {
                                     var encoded = item.Substring(0, 20);
-                                    string guid;
-                                    if (GuidHelper.GetDecodedGuid(encoded, out guid))
+                                    if (GuidHelper.GetDecodedGuid(encoded, out string guid))
                                     {
                                         if (shouldDelete(guid))
                                         {
@@ -1111,12 +1078,12 @@ namespace OfficeScrubNative
                                 if (newData.Count == 0)
                                 {
                                     _regHelper.DeleteValue(RegistryHiveType.ClassesRoot,
-                                        string.Format("{0}\\{1}", componentPath, component), value);
+                                        $"{componentPath}\\{component}", value);
                                 }
                                 else
                                 {
                                     _regHelper.SetValue(RegistryHiveType.ClassesRoot,
-                                        string.Format("{0}\\{1}", componentPath, component), value,
+                                        $"{componentPath}\\{component}", value,
                                         newData.ToArray(), RegistryValueKind.MultiString);
                                 }
                             }
@@ -1161,7 +1128,7 @@ namespace OfficeScrubNative
 
             foreach (var typeLib in KnownTypeLibs)
             {
-                var tlKey = string.Format("{0}\\{1}", typeLibPath, typeLib);
+                var tlKey = $"{typeLibPath}\\{typeLib}";
                 if (!_regHelper.KeyExists(RegistryHiveType.LocalMachine, tlKey))
                     continue;
 
@@ -1170,7 +1137,7 @@ namespace OfficeScrubNative
                 foreach (var version in versions)
                 {
                     bool canDelete = true;
-                    var versionKey = string.Format("{0}\\{1}", tlKey, version);
+                    var versionKey = $"{tlKey}\\{version}";
 
                     // Check Win32 and Win64 paths
                     foreach (var platform in new[] { "0\\Win32", "9\\Win32", "0\\Win64", "9\\Win64" })
@@ -1224,10 +1191,9 @@ namespace OfficeScrubNative
                 scope.Connect();
 
                 var className = versionNT > 601 ? "SoftwareLicensingProduct" : "OfficeSoftwareProtectionProduct";
-                var queryString = $"SELECT ID, ApplicationId, PartialProductKey, Name, ProductKeyID FROM {className} WHERE ApplicationId = '{officeAppId}' AND PartialProductKey <> NULL";
-                var query = new SelectQuery(queryString);
+                var queryString = $"SELECT ProductKeyID FROM {className} WHERE ApplicationId = '{officeAppId}' AND PartialProductKey <> NULL";
 
-                using (var searcher = new ManagementObjectSearcher(scope, query))
+                using (var searcher = new ManagementObjectSearcher(scope, new SelectQuery(queryString)))
                 {
                     var products = searcher.Get();
 
@@ -1348,6 +1314,19 @@ namespace OfficeScrubNative
 
     public class OfficeScrubOrchestrator
     {
+        // OPTIMIZATION: Static collections for validation
+        private static readonly HashSet<string> ValidSkus = new HashSet<string>
+        {
+            "007E", "008F", "008C", "24E1", "237A", "00DD"
+        };
+
+        private static readonly HashSet<string> SpecialProducts = new HashSet<string>
+        {
+            "{6C1ADE97-24E1-4AE4-AEDD-86D3A209CE60}",
+            "{9520DDEB-237A-41DB-AA20-F2EF2360DCEB}",
+            "{9AC08E99-230B-47E8-9721-4577B7F124EA}"
+        };
+
         public RegistryHelper Registry { get; private set; }
         public FileHelper Files { get; private set; }
         public ProcessHelper Processes { get; private set; }
@@ -1369,6 +1348,7 @@ namespace OfficeScrubNative
             Services = new ServiceHelper();
         }
 
+        // OPTIMIZATION: Use StringComparison.OrdinalIgnoreCase instead of .ToLower()
         public bool IsC2RPath(string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -1385,24 +1365,23 @@ namespace OfficeScrubNative
 
             var upper = productCode.ToUpperInvariant();
 
+            // OPTIMIZATION: Check special products first with HashSet O(1) lookup
+            if (SpecialProducts.Contains(upper))
+                return true;
+
             if (!upper.EndsWith(OfficeConstants.OFFICE_ID))
                 return false;
 
             // Check version
-            int version;
-            if (!int.TryParse(upper.Substring(3, 2), out version) || version <= 14)
+            if (!int.TryParse(upper.Substring(3, 2), out int version) || version <= 14)
                 return false;
 
-            // Check SKU
+            // Check SKU - OPTIMIZATION: HashSet O(1) lookup instead of array Contains O(n)
             var sku = upper.Substring(10, 4);
-            var validSkus = new[] { "007E", "008F", "008C", "24E1", "237A", "00DD" };
-
-            return validSkus.Contains(sku) ||
-                   upper == "{6C1ADE97-24E1-4AE4-AEDD-86D3A209CE60}" ||
-                   upper == "{9520DDEB-237A-41DB-AA20-F2EF2360DCEB}" ||
-                   upper == "{9AC08E99-230B-47E8-9721-4577B7F124EA}";
+            return ValidSkus.Contains(sku);
         }
     }
 
     #endregion
 }
+

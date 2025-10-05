@@ -552,7 +552,7 @@ function Clean-OfficeRegistry {
 
 function Clear-OfficeHKLM {
     param([string]$SubKey)
-    
+
     # Recursively clean Office HKLM key of C2R references
     $keys = Get-RegistryKeys -Hive LocalMachine -SubKey $SubKey
     foreach ($key in $keys) {
@@ -577,7 +577,7 @@ function Clear-OfficeHKLM {
 function Clear-RunKeyEntries {
     $runKey = "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
     $values = Get-RegistryValues -Hive LocalMachine -SubKey $runKey
-    
+
     foreach ($value in $values) {
         $data = Get-RegistryValue -Hive LocalMachine -SubKey $runKey -ValueName $value
         if ($data -and (Test-IsC2R $data.ToString())) {
@@ -591,7 +591,7 @@ function Clear-RunKeyEntries {
 
 function Clear-ARPEntries {
     $arpKeys = Get-RegistryKeys -Hive LocalMachine -SubKey $script:REG_ARP
-    
+
     foreach ($key in $arpKeys) {
         if ($key.Length -gt 37) {
             $guid = $key.Substring(0, 38).ToUpper()
@@ -676,7 +676,7 @@ function Complete-Cleanup {
     Write-LogSubHeader "Delete Services"
     Write-Log "Delete OfficeSvc service"
     Remove-Service -ServiceName "OfficeSvc"
-    
+
     Write-Log "Delete ClickToRunSvc service"
     Remove-Service -ServiceName "ClickToRunSvc"
 
@@ -691,14 +691,14 @@ function Complete-Cleanup {
 
     # Delete C2R package files and Office folders
     Write-LogSubHeader "Delete Files and Folders"
-    
+
     $fDelFolders = $false
     $checkPaths = @(
         "$script:ProgramFiles\Microsoft Office 15",
         "$script:ProgramFiles\Microsoft Office 16",
         "$script:ProgramFiles\Microsoft Office\PackageManifests"
     )
-    
+
     if ($script:Is64Bit) {
         $checkPaths += "$script:ProgramFilesX86\Microsoft Office\PackageManifests"
     }
@@ -909,7 +909,7 @@ function Show-Summary {
         Write-Log "===================================================================="
         Write-Log "REBOOT REQUIRED - System restart needed to complete uninstall"
         Write-Log "===================================================================="
-        
+
         if (-not $script:Quiet) {
             $response = Read-Host "Do you want to reboot now? (Y/N)"
             if ($response -match "^[Yy]") {
