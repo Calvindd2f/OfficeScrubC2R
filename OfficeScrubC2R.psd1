@@ -3,7 +3,7 @@
     RootModule             = 'OfficeScrubC2R.psm1'
 
     # Version number of this module.
-    ModuleVersion          = '2.19.0'
+    ModuleVersion          = '2.19.1'
 
     # Supported PSEditions
     CompatiblePSEditions   = @('Desktop', 'Core')
@@ -95,7 +95,7 @@ Requires Administrator privileges.
         'build.ps1',
         'LICENSE',
         'README.md',
-        'CHANGELOG.md'
+        'docs\CHANGELOG.md'
     )
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.

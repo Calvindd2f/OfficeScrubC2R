@@ -206,7 +206,7 @@ function Invoke-OfficeScrubC2R {
         # Cleanup is handled by the main script
     }
 }
-[void](Initialize-Environment)
+
 # Export module members
 Export-ModuleMember -Function @(
     'Invoke-OfficeScrubC2R',
@@ -218,4 +218,14 @@ Export-ModuleMember -Function @(
     'Remove-OfficeC2R',
     'Uninstall-OfficeC2R'
 )
+
+# Initialize environment after all exports
+# This must happen after the utilities module is fully loaded
+try {
+    Initialize-Environment
+    Write-Verbose "OfficeScrubC2R environment initialized successfully"
+}
+catch {
+    Write-Warning "Failed to initialize OfficeScrubC2R environment: $_"
+}
 

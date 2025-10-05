@@ -691,12 +691,22 @@ function Test-IsC2R {
     [CmdletBinding()]
     param([string]$Path)
 
+    if ($null -eq $script:Orchestrator) {
+        Write-Warning "Orchestrator not initialized. Call Initialize-Environment first."
+        return $false
+    }
+
     return $script:Orchestrator.IsC2RPath($Path)
 }
 
 function Test-ProductInScope {
     [CmdletBinding()]
     param([string]$ProductCode)
+
+    if ($null -eq $script:Orchestrator) {
+        Write-Warning "Orchestrator not initialized. Call Initialize-Environment first."
+        return $false
+    }
 
     return $script:Orchestrator.IsInScope($ProductCode)
 }

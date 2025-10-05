@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.1] - 2025-10-05
+
+### Fixed
+
+- **Critical**: Fixed module initialization order - `Initialize-Environment` now runs automatically on module import
+- **Critical**: Fixed empty path parameter error in `Initialize-Script` by reordering function calls to initialize environment before logging
+- **Critical**: Added null checks to `Test-IsC2R` and `Test-ProductInScope` to prevent null reference errors
+- Fixed module loading sequence to ensure utilities module is fully loaded before initialization
+
+### Changed
+
+- `Initialize-Environment` is now called after module exports instead of during module load
+- `Initialize-Script` now calls `Initialize-Environment` before `Initialize-Log` to ensure `$script:LogDir` is properly set
+- Improved error handling with proper warning messages when orchestrator is not initialized
+
+## [2.19.0] - 2025-10-05
+
+### Added
+
+- Initial PowerShell Gallery release
+- Complete PowerShell/C# port of Microsoft's OffScrubC2R.vbs v2.19
+- Native C# library (`OfficeScrubNative.dll`) for high-performance operations
+- Comprehensive logging and error handling
+- Support for Office 2013, 2016, 2019, and Office 365 C2R products
+
 ## [2.2.0] - 2025-05-10
 
 I've created an optimized version of your C# code with significant performance improvements:

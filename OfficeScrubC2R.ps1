@@ -80,9 +80,7 @@ Import-Module -Name (Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1") -F
 #region Main Script Functions
 
 function Initialize-Script {
-    Write-LogHeader ("Office C2R Scrubber v{0} - Initialization" -f $script:SCRIPT_VERSION)
-
-    # Set script parameters
+    # Set script parameters FIRST (before any logging)
     $script:Quiet = $Quiet
     $script:DetectOnly = $DetectOnly
     $script:Force = $Force
@@ -101,24 +99,28 @@ function Initialize-Script {
     # Get system information
     Get-SystemInfo
 
-    # Initialize environment
+    # Initialize environment (MUST come before logging since it sets $script:LogDir)
     Initialize-Environment
 
     # Check elevation
     $script:IsElevated = Test-IsElevated
     if (-not $script:IsElevated -and -not $script:NoElevate) {
-        Write-Log "Error: Insufficient privileges - script requires Administrator rights"
+        Write-Warning "Error: Insufficient privileges - script requires Administrator rights"
         Set-ErrorCode $script:ERROR_ELEVATION
         return $false
     }
 
-    # Initialize logging
+    # Initialize logging (now $script:LogDir is properly set)
     if ($LogPath) {
+        $script:LogDir = $LogPath
         Initialize-Log $LogPath
     }
     else {
         Initialize-Log $script:LogDir
     }
+
+    # NOW we can use logging functions
+    Write-LogHeader ("Office C2R Scrubber v{0} - Initialization" -f $script:SCRIPT_VERSION)
 
     Write-Log ("System Information: {0}" -f $script:OSInfo)
     Write-Log ("64-bit System: {0}" -f $script:Is64Bit)
