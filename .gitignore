@@ -1,0 +1,55 @@
+# Build outputs
+*.dll
+*.pdb
+*.exe
+
+# Logs
+*.log
+*.txt
+logs/
+ScrubRetValFile.txt
+
+# PowerShell artifacts
+*.ps1xml
+*.psm1.bak
+*.psd1.bak
+
+# Test results
+TestResults/
+*.trx
+
+# IDE and editor files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Temp folders
+temp/
+tmp/
+[Tt]emp*/
+
+# Package folders
+release/
+dist/
+publish/
+
+# Local test files
+test-output/
+scratch/
+
+# User-specific files
+*.local.ps1
+*.private.ps1
+
+# Keep these artifacts (exceptions to above rules)
+!OfficeScrubNative.dll
+

@@ -93,7 +93,7 @@ ParseCmdLine
                                 ' Stage # 0 - Basic detection |
                                 '-----------------------------
 
-LogH "Stage # 0 " & chr(34) & "Basic detection" & chr(34) 
+LogH "Stage # 0 " & chr(34) & "Basic detection" & chr(34)
 LogY "stage0"
 
 ' ensure integrity of WI metadata which could fail used APIs otherwise
@@ -108,7 +108,7 @@ EnsureValidWIMetadata HKCR, "Installer\Components", COMPRESSED
 ' build a list with installed/registered Office products
 '-------------------------------------------------------
 FindInstalledOProducts
-If dicC2RSuite.Count > 0 Then 
+If dicC2RSuite.Count > 0 Then
     Log "Registered ARP product(s) found:"
     For Each Key In dicC2RSuite.Keys
     	Log " - " & Key & " - " & dicC2RSuite.Item(Key)
@@ -131,7 +131,7 @@ ElseIf RegReadValue(HKLM, "SOFTWARE\Microsoft\Office\ClickToRun", "PackageFolder
 	sPackageFolder = sValue
 End If
 ' if sPackageFolder is invalid set it to the c2r registry reference string
-If NOT Len(sPackageFolder) > 0 OR IsNull(sPackageFolder) Then 
+If NOT Len(sPackageFolder) > 0 OR IsNull(sPackageFolder) Then
 	If oFso.FolderExists(oWShell.ExpandEnvironmentStrings("%programfiles%") & "\Microsoft Office 15") Then
 		sPackageFolder = oWShell.ExpandEnvironmentStrings("%programfiles%") & "\Microsoft Office 15"
 	ElseIf oFso.FolderExists(oWShell.ExpandEnvironmentStrings("%programfiles%") & "\Microsoft Office 16") Then
@@ -166,18 +166,18 @@ LogY "stage1"
 
 ' clean OSPP
 '-----------
-LogH1 "Clean OSPP" 
+LogH1 "Clean OSPP"
 If NOT fKeepLicense Then CleanOSPP
 
 ' clean vNext
 '------------
-LogH1 "Clean vNext Licenses" 
+LogH1 "Clean vNext Licenses"
 If NOT fKeepLicense Then ClearVNextLicCache
 
 ' end all running Office applications
 '------------------------------------
-LogH1 "End running processes" 
-'LogY "stage2" 
+LogH1 "End running processes"
+'LogY "stage2"
 If NOT dicKeepSku.Count > 0 Then ClearShellIntegrationReg
 CloseOfficeApps
 
@@ -188,14 +188,14 @@ If NOT fDetectOnly Then DelSchtasks
 ' unpin shortcuts
 '----------------
 ' need to unpin as long as the shortcuts are still valid!
-LogH1 "Clean shortcuts" 
-'LogY "stage3" 
+LogH1 "Clean shortcuts"
+'LogY "stage3"
 CleanShortcuts sAllusersProfile, True, True
 CleanShortcuts sProfilesDirectory, True, True
 
 ' uninstall
 '----------
-LogH1 "Remove " & ONAME  
+LogH1 "Remove " & ONAME
 Uninstall
 
                                 '---------------------
@@ -232,7 +232,7 @@ ExitScript
 '-------------------------------------------------------------------------------
 '   ExitScript
 '
-'   Returncode and reboot handler 
+'   Returncode and reboot handler
 '-------------------------------------------------------------------------------
 Sub ExitScript
     Dim sPrompt
@@ -243,7 +243,7 @@ Sub ExitScript
     SetRetVal iError
 
     ' log result
-    If CBool(iError AND ERROR_INCOMPLETE) Then 
+    If CBool(iError AND ERROR_INCOMPLETE) Then
         LogH2 "Removal result: " & iError & " - INCOMPLETE. Uninstall requires a system reboot to complete."
     Else
         sTmp = " - SUCCESS"
@@ -267,7 +267,7 @@ Sub ExitScript
         'If CBool(iError AND ERROR_USER_ABORT) Then Log " - Process terminated by user"
     End If
 
-    LogH2 "Removal end." 
+    LogH2 "Removal end."
     LogY "stage5"
 
     ' Check if we need to show a simplified return code
@@ -288,7 +288,7 @@ Sub ExitScript
         If fOverallSuccess Then iError = ERROR_SUCCESS
 
         sTmp = "ReturnErrorOrSuccess switch has been set. The current value return code translates to: "
-        If fOverallSuccess Then 
+        If fOverallSuccess Then
             iError = ERROR_SUCCESS
             LogY "result:stage5:true"
             Log sTmp & "SUCCESS"
@@ -298,7 +298,7 @@ Sub ExitScript
         End If
 
     End If
-   
+
     ' Reboot handling
     If fRebootRequired Then
     	LogY "reboot"
@@ -376,7 +376,7 @@ Sub Initialize ()
     sTemp               = oWShell.ExpandEnvironmentStrings("%temp%")
     sAllUsersProfile    = oWShell.ExpandEnvironmentStrings("%allusersprofile%")
     RegReadValue HKLM, "SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList", "ProfilesDirectory", sProfilesDirectory, "REG_EXPAND_SZ"
-    If NOT oFso.FolderExists(sProfilesDirectory) Then 
+    If NOT oFso.FolderExists(sProfilesDirectory) Then
         sProfilesDirectory  = oFso.GetParentFolderName(oWShell.ExpandEnvironmentStrings("%userprofile%"))
     End If
     sProgramFiles       = oWShell.ExpandEnvironmentStrings("%programfiles%")
@@ -428,8 +428,8 @@ Sub Initialize ()
     ' get Win32_OperatingSystem details
     '----------------------------------
     Set ComputerItem = oWmiLocal.ExecQuery("Select * from Win32_OperatingSystem")
-    For Each Item in ComputerItem 
-        sOSinfo = sOSinfo & Item.Caption 
+    For Each Item in ComputerItem
+        sOSinfo = sOSinfo & Item.Caption
         sOSinfo = sOSinfo & Item.OtherTypeDescription
         sOSinfo = sOSinfo & ", " & "SP " & Item.ServicePackMajorVersion
         sOSinfo = sOSinfo & ", " & "Version: " & Item.Version
@@ -557,7 +557,7 @@ Sub ParseCmdLine
     Dim iCnt, iArgCnt
     Dim arrArguments, sArguments
     Dim sArg0
-    
+
     iArgCnt = Wscript.Arguments.Count
     If iArgCnt > 0 Then
         If wscript.Arguments(0) = "UAC" Then
@@ -600,7 +600,7 @@ Sub ParseCmdLine
         fRemoveOse = False
         sSkuRemoveList = sArg0
     End Select
-    
+
     For iCnt = 0 To UBound(arrArguments)
         Select Case arrArguments(iCnt)
         Case "?", "/?", "-?"
@@ -608,17 +608,17 @@ Sub ParseCmdLine
 
         Case "/DETECTONLY", "/PREVIEW"
             fDetectOnly = True
-        
+
         Case "/FORCEARPUNINSTALL"
             fForceArpUninstall = True
-        
+
         Case "/KL", "/KEEPLICENSE"
             fKeepLicense = True
-        
+
         Case "/L", "/LOG"
             fLogInitialized = False
             If UBound(arrArguments) > iCnt Then
-                If oFso.FolderExists(arrArguments(iCnt + 1)) Then 
+                If oFso.FolderExists(arrArguments(iCnt + 1)) Then
                     sLogDir = arrArguments(iCnt + 1)
                 Else
                     On Error Resume Next
@@ -626,28 +626,28 @@ Sub ParseCmdLine
                     If Err <> 0 Then sLogDir = sScrubDir Else sLogDir = arrArguments(iCnt + 1)
                 End If
             End If
-        
+
         Case "/N", "/NOCANCEL"
             fNoCancel = True
-        
+
         Case "/NE", "/NOELEVATE"
             fNoElevate = True
 
         Case "/OFFLINE", "/FORCEOFFLINE"
             fOffline = True
-        
+
         Case "/O", "/OSE"
             fRemoveOse = True
-        
+
         Case "/Q", "/QUIET"
             fQuiet = True
-        
+
         Case "/RETERRORSUCCESS", "/RETURNERRORORSUCCESS", "/REOS"
             fReturnErrorOrSuccess = True
 
         Case "/S", "/SKIPSD", "/SKIPSHORTCUTDETECTION"
             fSkipSD = True
-        
+
         ' for test purposes only!
         Case "/TR", "/TESTRERUN"
             fTestRerun = True
@@ -656,7 +656,7 @@ Sub ParseCmdLine
     Next 'iCnt
     If Not fLogInitialized Then CreateLog
     LogH2 "Arguments: " & sArguments & vbCrLf
-    
+
 End Sub 'ParseCmdLine
 
 '-------------------------------------------------------------------------------
@@ -705,12 +705,12 @@ Sub FindInstalledOProducts
 
 
     If dicInstalledSku.Count > 0 Then Exit Sub 'Already done from command line parser
-    
+
     fDisplayVersion = False
 
     ' identify C2R products
     LogH1 "Detect installed products "
-    
+
 	LogOnly "Check for O15 C2R products"
 	' Check O15 Configuration key
     If RegReadValue(HKLM, REG_O15C2RCONFIGURATION, "ProductReleaseIds", sValue, "REG_SZ") Then
@@ -730,7 +730,7 @@ Sub FindInstalledOProducts
             Next 'prod
         End If
     End If
-    
+
     ' Check O15 PropertyBag key
     If RegReadValue(HKLM, REG_O15RPROPERTYBAG, "productreleaseid", sValue, "REG_SZ") Then
         arrProducts = Split(sValue, ",")
@@ -748,7 +748,7 @@ Sub FindInstalledOProducts
             Next 'prod
         End If
     End If
-    
+
 	'O16 section
 	LogOnly "Check for Office C2R products (>=QR8)"
 	' Check Office Configuration key
@@ -762,7 +762,7 @@ Sub FindInstalledOProducts
     				fDisplayVersion = RegReadValue(HKLM, REG_C2RPRODUCTIDS & sActiveConfiguration & "\culture\" & cult, "Version", sVersionFallback, "REG_SZ")
     			End If
     		Next 'cult
-    	End If 
+    	End If
     	' Update product dic
     	If RegEnumKey(HKLM, REG_C2RPRODUCTIDS & sActiveConfiguration, arrProducts) Then
     		For Each prod In arrProducts
@@ -853,9 +853,9 @@ Sub FindInstalledOProducts
                 	dicInstalledSku.Add LCase(prod), sDisplayVersion
                 End If
                 ' categorize the SKU as C2R
-                If NOT dicC2RSuite.Exists(ArpItem) Then dicC2RSuite.Add ArpItem, prod & " - " & sDisplayVersion 
+                If NOT dicC2RSuite.Exists(ArpItem) Then dicC2RSuite.Add ArpItem, prod & " - " & sDisplayVersion
             Else
-            
+
 	            'Legacy logic keep for compat reasons
 	            sValue = ""
 	            sDisplayVersion = ""
@@ -872,7 +872,7 @@ Sub FindInstalledOProducts
 	                End If
 	            End If
 	            fUninstallString = RegReadValue(HKLM, sCurKey, "UninstallString", sUninstallString, "REG_SZ")
-	            
+
 	            ' filter on C2R configuration SKU
 	            If (fUninstallString And( (InStr(UCase(sUninstallString), UCase("Microsoft Office 1")) > 0) Or (InStr(UCase(sUninstallString), UCase("OfficeClickToRun.exe")) > 0) )) Then
 	                ' Extract the ProductReleaseID
@@ -910,7 +910,7 @@ Sub FindInstalledOProducts
 	                	dicInstalledSku.Add LCase(sConfigName), sDisplayVersion
 	                End If
 	                ' categorize the SKU as C2R
-	                If NOT dicC2RSuite.Exists(ArpItem) Then dicC2RSuite.Add ArpItem, sConfigName & " - " & sDisplayVersion 
+	                If NOT dicC2RSuite.Exists(ArpItem) Then dicC2RSuite.Add ArpItem, sConfigName & " - " & sDisplayVersion
 	            ElseIf (fDisplayVersion AND (InStr(UCase(ArpItem), UCase("OFFICE15.")) > 0 Or InStr(UCase(ArpItem), UCase("OFFICE16.")) > 0)) Then
 	                ' classic .msi install SKU
 	                iLeft = InStr(ArpItem, ".") + 1
@@ -919,7 +919,7 @@ Sub FindInstalledOProducts
 	                sCulture = ""
 	                If NOT dicKeepSku.Exists(ArpItem) Then dicKeepSku.Add ArpItem, sConfigName & " - " & sDisplayVersion
 	            End If
-	            
+
 	            ' Other products
 	            If InScope(ArpItem) Then
 	                Select Case Mid(ArpItem, 11, 4)
@@ -950,13 +950,13 @@ Sub FindInstalledOProducts
 	                End Select
 	            Else
                     ' not in scope for c2r removal!
-	            End If 'InScope  
+	            End If 'InScope
 	            ' End legacy logic
-	            
+
             End If
         Next 'ArpItem
     End If
-    
+
 End Sub 'FindInstalledOProducts
 
 '-------------------------------------------------------------------------------
@@ -985,12 +985,12 @@ End Sub 'EnsureValidWIMetadata
 '-------------------------------------------------------------------------------
 '   CleanOSPP
 '
-'   Clean out licenses from the Office Software Protection Platform 
+'   Clean out licenses from the Office Software Protection Platform
 '-------------------------------------------------------------------------------
 Sub CleanOSPP
     Dim oProductInstances, pi
     Dim sCleanOSPP, sCmd, sRetVal
-    LogY "CleanOSPP" 
+    LogY "CleanOSPP"
 
     CONST OfficeAppId = "0ff1ce15-a989-479d-af46-f275c6370663"  'Office 2013
 
@@ -1005,13 +1005,13 @@ Sub CleanOSPP
         On Error Goto 0
         Exit Sub
     End If
-    
+
     On Error Resume Next
     If NOT (dicC2RSuite.Count > 0 OR dicKeepSku.Count > 0) Then
         Log "Skip CleanOSPP"
         Exit Sub
     End If
-    
+
     ' Initialize the software protection platform object with a filter on Office 2013 products
     If iVersionNT > 601 Then
         Set oProductInstances = oWmiLocal.ExecQuery("SELECT ID, ApplicationId, PartialProductKey, Name, ProductKeyID FROM SoftwareLicensingProduct WHERE ApplicationId = '" & OfficeAppId & "' " & "AND PartialProductKey <> NULL")
@@ -1032,14 +1032,14 @@ End Sub 'CleanOSPP
 '-------------------------------------------------------------------------------
 '   ClearVNextLicCache
 '
-'   clear local license cache for vNext 
+'   clear local license cache for vNext
 '-------------------------------------------------------------------------------
 Sub ClearVNextLicCache
 	Dim sLocalAppData, sValue
-	
+
 	sLocalAppData = oWShell.ExpandEnvironmentStrings("%localappdata%")
     DeleteFolder sLocalAppData & "\Microsoft\Office\Licenses"
-    
+
 End Sub 'ClearSCALicCache
 
 
@@ -1053,7 +1053,7 @@ Sub DelSchtasks ()
 
     If CBool(iError AND ERROR_USERCANCEL) Then Exit Sub
 
-    LogH1 "Remove scheduled tasks" 
+    LogH1 "Remove scheduled tasks"
 
     LogOnly "FF_INTEGRATEDstreamSchedule"
     oWShell.Run "SCHTASKS /Delete /TN FF_INTEGRATEDstreamSchedule /F", 0, False
@@ -1127,7 +1127,7 @@ Sub CloseOfficeApps
     Dim sAppName, sOut, sUserWarn
     Dim fWait
     Dim iRet
-    
+
     On Error Resume Next
     fWait = False
     iProcCloseCnt = iProcCloseCnt + 1
@@ -1148,14 +1148,14 @@ Sub CloseOfficeApps
         Set Processes = oWmiLocal.ExecQuery("Select * From Win32_Process")
         For Each Process in Processes
             For Each prop in Process.Properties_
-                If prop.Name = "ExecutablePath" Then 
+                If prop.Name = "ExecutablePath" Then
                     If IsC2R(prop.Value) Then sUserWarn = sUserWarn & vbCrLf & " - " & Process.Name
                 End If 'ExcecutablePath
             Next 'prop
         Next 'Process
         If (InStr(sUserWarn, " - ") > 0 AND NOT fQuiet) Then
             iRet = MsgBox(sUserWarn, 49, "Save your unsaved work now!")
-            If iRet = 2 Then 
+            If iRet = 2 Then
                 SetError ERROR_USERCANCEL
                 ExitScript
             Else
@@ -1181,14 +1181,14 @@ Sub CloseOfficeApps
     Set Processes = oWmiLocal.ExecQuery("Select * From Win32_Process")
     For Each Process in Processes
         For Each prop in Process.Properties_
-            If prop.Name = "ExecutablePath" Then 
+            If prop.Name = "ExecutablePath" Then
                 If IsC2R(prop.Value) Then
                     sOut = "End process '" & Process.Name
                     iRet = Process.Terminate()
                     CheckError "CloseOfficeApps: " & Process.Name
                     Log sOut & "' returned: " & iRet
                     fWait = True
-                End If 
+                End If
             End If 'ExcecutablePath
         Next 'prop
     Next 'Process
@@ -1232,13 +1232,13 @@ Sub Uninstall
     For i = 1 To 4
     	Select Case i
     	Case 1
-	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\15.0\ClickToRun", "PackageFolder", sPkgFld, "REG_SZ" 
+	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\15.0\ClickToRun", "PackageFolder", sPkgFld, "REG_SZ"
 	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\15.0\ClickToRun", "PackageGUID", sPkgGuid, "REG_SZ"
 	    Case 2
-	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\16.0\ClickToRun", "PackageFolder", sPkgFld, "REG_SZ" 
+	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\16.0\ClickToRun", "PackageFolder", sPkgFld, "REG_SZ"
 	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\16.0\ClickToRun", "PackageGUID", sPkgGuid, "REG_SZ"
 	    Case 3
-	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\ClickToRun", "PackageFolder", sPkgFld, "REG_SZ" 
+	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\ClickToRun", "PackageFolder", sPkgFld, "REG_SZ"
 	    	RegReadValue HKLM, "SOFTWARE\Microsoft\Office\ClickToRun", "PackageGUID", sPkgGuid, "REG_SZ"
 	    Case 4
 	    	sPkgFld = sPackageFolder
@@ -1280,7 +1280,7 @@ Sub Uninstall
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Office\16.0\ClickToRun"
     RegDeleteKey HKCU, "SOFTWARE\Microsoft\Office\ClickToRun"
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Office\ClickToRun"
-    
+
     ' AppV keys
     hDefKey = HKCU
     sSubKeyName = "SOFTWARE\Microsoft\AppV\ISV"
@@ -1312,9 +1312,9 @@ Sub Uninstall
     LogH2 "Detect Msi based products"
     For Each prod in oMsi.Products
         If CheckDelete(prod) Then
-            Log "Call msiexec.exe to remove " & prod 
+            Log "Call msiexec.exe to remove " & prod
             sUninstallCmd = "msiexec.exe /x" & prod & sMsiProp
-            If fQuiet Then 
+            If fQuiet Then
                 sUninstallCmd = sUninstallCmd & " /q"
             Else
                 sUninstallCmd = sUninstallCmd & " /qb-!"
@@ -1346,17 +1346,17 @@ End Sub 'Uninstall
 Sub BuildRemoveXml ()
 	Dim ConfigFileStream
 	Dim sConfigRemoveAllXml
-	
+
 	Const FOR_WRITING   = 2
-	
+
 	On Error Resume Next
-	
+
 	LogOnly "BuildRemoveXml"
-	sConfigRemoveAllXml = "<Configuration>" & vbCrLf & _ 
+	sConfigRemoveAllXml = "<Configuration>" & vbCrLf & _
 	             "  <Remove All=" & Chr(34) & "TRUE" & Chr(34) & " />" & vbCrLf & _
 				 "</Configuration>"
 	If fQuiet Then
-	    sConfigRemoveAllXml = "<Configuration>" & vbCrLf & _ 
+	    sConfigRemoveAllXml = "<Configuration>" & vbCrLf & _
 	                 "  <Remove All=" & Chr(34) & "TRUE" & Chr(34) & " />" & vbCrLf & _
                      "  <Display Level=" & Chr(34) & "None" & Chr(34) & " />" & vbCrLf & _
 				     "</Configuration>"
@@ -1368,7 +1368,7 @@ Sub BuildRemoveXml ()
 	ConfigFileStream.Close
 	Set ConfigFileStream = Nothing
 	LogOnly "RemoveAll.xml:" & vbCrLf & sConfigRemoveAllXml
-	
+
 End Sub 'BuildRemoveXml
 
 '-------------------------------------------------------------------------------
@@ -1388,7 +1388,7 @@ Function HttpDownloadFile (sUrl, sLocalPath)
     ' download the file
     oWinHttpReq.Open "GET", sUrl, false
     oWinHttpReq.Send()
-    
+
     ' save the file
     oAdoDbStream.Type = 1
     oAdoDbStream.Open()
@@ -1411,9 +1411,9 @@ Sub UninstallOfficeC2R ()
 	Dim sCmd, sReturn, sODTFullPath, sKey, sFolder, sUrl, sLeft, sRight
     Dim iVerODT
     Dim fCanUseOdtUninstall
-	
+
 	On Error Resume Next
-	
+
 	fCanUseOdtUninstall = False
     sODTFullPath = ""
 	iVerODT = 0
@@ -1426,9 +1426,9 @@ Sub UninstallOfficeC2R ()
 	If RegValExists(HKLM, "SOFTWARE\Microsoft\Office\ClickToRun\ProductReleaseIDs\Active\culture", "x-none") Or _
 	   RegValExists(HKLM, "SOFTWARE\Microsoft\Office\15.0\ClickToRun\ProductReleaseIDs\Active\culture", "x-none") Or _
 	   RegValExists(HKLM, "SOFTWARE\Microsoft\Office\ClickToRun\ProductReleaseIDs", "ActiveConfiguration") Then
-		
+
         LogH "ODT Uninstall C2R " & iVerODT & ".0"
-		
+
         If NOT fForceArpUninstall Then
             'build the remove.xml
 		    BuildRemoveXml
@@ -1441,7 +1441,7 @@ Sub UninstallOfficeC2R ()
                 'ODT not available. Try to download
                 If NOT fOffline Then
                     If iVerODT = 15 Then
-                        If HttpDownloadFile("https://download.microsoft.com/download/6/2/3/6230F7A2-D8A9-478B-AC5C-57091B632FCF/officedeploymenttool_x86_5031-1000.exe", sScrubDir & "\officedeploymenttool.exe") Then 
+                        If HttpDownloadFile("https://download.microsoft.com/download/6/2/3/6230F7A2-D8A9-478B-AC5C-57091B632FCF/officedeploymenttool_x86_5031-1000.exe", sScrubDir & "\officedeploymenttool.exe") Then
                             'Referer: https://www.microsoft.com/en-us/download/confirmation.aspx?id=36778
                             'Extract
                             sCmd = Chr(34) & sScrubDir & "\officedeploymenttool.exe" & Chr(34) & " /quiet /extract:" & Chr(34) & sScrubDir & Chr(34)
@@ -1451,16 +1451,16 @@ Sub UninstallOfficeC2R ()
                             If oFso.FileExists(sODTFullPath) Then fCanUseOdtUninstall = True
                         End If
                     Else
-                        If HttpDownloadFile("http://officecdn.microsoft.com/pr/wsus/setup.exe", sScrubDir & "\setup.exe") Then 
+                        If HttpDownloadFile("http://officecdn.microsoft.com/pr/wsus/setup.exe", sScrubDir & "\setup.exe") Then
                             sODTFullPath = sScrubDir & "\setup.exe"
                             fCanUseOdtUninstall = True
                         End If
                     End If
                 End If 'fOffline
             End If
-        
+
             Log "Can use ODT based uninstall: " & fCanUseOdtUninstall
-		
+
             If fCanUseOdtUninstall Then
 		        'build uninstall command
                 sCmd = Chr(34) & sODTFullPath & Chr(34) & " /configure " & Chr(34) & sScrubDir & "\RemoveAll.xml" & Chr(34)
@@ -1487,7 +1487,7 @@ Sub UninstallOfficeC2R ()
 	Else
 		Log "Uninstall for OfficeC2R not required"
 	End If
-	
+
     'Log uninstall success
 	Log "Log uninstall success"
 
@@ -1497,17 +1497,17 @@ Sub UninstallOfficeC2R ()
 	sFolder = Chr(34) & oWShell.ExpandEnvironmentStrings("%programfiles%") & "\Microsoft Office\root" & Chr(34)
 	Log sFolder & " still exists: " & oFso.FolderExists(sFolder)
 
-	If f64 Then 
+	If f64 Then
 		sFolder = Chr(34) & oWShell.ExpandEnvironmentStrings("%programfiles(x86)%") & "\Microsoft Office\root" & Chr(34)
 		Log sFolder & " exists: " & oFso.FolderExists(sFolder)
 	End If
-	
+
 End Sub 'UninstallOfficeC2R
 
 '-------------------------------------------------------------------------------
 '   RegWipe
 '
-'   Removal of left behind registry data 
+'   Removal of left behind registry data
 '-------------------------------------------------------------------------------
 Sub Regwipe
     Dim hDefKey, item, name, value, RetVal
@@ -1520,10 +1520,10 @@ Sub Regwipe
     If CBool(iError AND ERROR_USERCANCEL) Then Exit Sub
 
     LogH1 "Registry CleanUp"
-    
+
     'Moved to earlier timing to avoid reboot needs
     'If NOT dicKeepSku.Count > 0 Then ClearShellIntegrationReg
-    
+
     CloseOfficeApps
 
     ' Note: ARP entries have already been cleared in uninstall stage
@@ -1533,7 +1533,7 @@ Sub Regwipe
     RegDeleteKey HKCU, "Software\Microsoft\Office\16.0\Registration"
     RegDeleteKey HKCU, "Software\Microsoft\Office\Registration"
 
-    
+
     ' C2R specifics
     ' AppV key "SOFTWARE\Microsoft\AppV" has already been cleared in uninstall stage
 
@@ -1548,7 +1548,7 @@ Sub Regwipe
     'O16
     '{F8E61EDD-EA25-484e-AC8A-7447F2AAE2A9}
 
-    
+
     ' C2R keys
     RegDeleteKey HKCU, "SOFTWARE\Microsoft\Office\15.0\ClickToRun"
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Office\15.0\ClickToRun"
@@ -1559,7 +1559,7 @@ Sub Regwipe
     RegDeleteKey HKCU, "SOFTWARE\Microsoft\Office\ClickToRun"
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Office\ClickToRun"
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Office\ClickToRunStore"
-    
+
     ' Office key in HKLM
     If Not dicKeepSku.Count > 0 Then
     	'double calls to ensure Wow6432 gets cleared out as well
@@ -1581,9 +1581,9 @@ Sub Regwipe
     End If
     RegDeleteValue HKLM, "SOFTWARE\Microsoft\Windows\CurrentVersion\Run", "Lync15", False
     RegDeleteValue HKLM, "SOFTWARE\Microsoft\Windows\CurrentVersion\Run", "Lync16", False
-    
+
     ' ARP
-    ' Note: configuration entries have already been removed 
+    ' Note: configuration entries have already been removed
     ' as part of the 'Uninstall' stage
     If RegEnumKey(HKLM, REG_ARP, arrKeys) Then
         For Each item in arrKeys
@@ -1601,16 +1601,16 @@ Sub Regwipe
         Case 1
             sSubKeyName = "SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UpgradeCodes\"
             hDefKey = HKLM
-        Case 2 
+        Case 2
             sSubKeyName = "Installer\UpgradeCodes\"
             hDefKey = HKCR
         Case 3
             sSubKeyName = "SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Products\"
             hDefKey = HKLM
-        Case 4 
+        Case 4
             sSubKeyName = "Installer\Features\"
             hDefKey = HKCR
-        Case 5 
+        Case 5
             sSubKeyName = "Installer\Products\"
             hDefKey = HKCR
         End Select
@@ -1619,7 +1619,7 @@ Sub Regwipe
                 ' ensure the expected length for a compressed GUID
                 If Len(item) = 32 Then
                     ' expand the GUID
-                    sGuid = GetExpandedGuid(item) 
+                    sGuid = GetExpandedGuid(item)
                     ' check if it's an Office key
                     If CheckDelete(sGuid) Then
                         If iLoopCnt < 3 Then
@@ -1695,7 +1695,7 @@ Sub Regwipe
                                             If CheckDelete(sGuid) Then
                                                 fDelReg = True
                                             Else
-                                                i = i + 1 
+                                                i = i + 1
                                                 ReDim Preserve arrMultiSzNewValues(i)
                                                 arrMultiSzNewValues(i) = value
                                             End If 'CheckDelete
@@ -1729,13 +1729,13 @@ End Sub 'Regwipe
 '   ClearShellIntegrationReg
 '
 '   Delete registry items that may cause Explorer / Windows Shell to have a lock
-'   on files 
+'   on files
 '-------------------------------------------------------------------------------
 Sub ClearShellIntegrationReg
     Dim Processes, Process
     Dim sOut
     Dim iRet
-    
+
 '    Set Processes = oWmiLocal.ExecQuery("Select * From Win32_Process Where Name like 'explorer.exe'")
 '    For Each Process in Processes
 '        sOut = "End process '" & Process.Name
@@ -1745,7 +1745,7 @@ Sub ClearShellIntegrationReg
 '    Next 'Process
 '    wscript.sleep 500
 
-    
+
     ' Protocol Handlers
     RegDeleteKey HKLM, "SOFTWARE\Classes\Protocols\Handler\osf"
 
@@ -1790,7 +1790,7 @@ Sub ClearShellIntegrationReg
 
     ' OneNote Namespace Extension for Desktop
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{0875DCB6-C686-4243-9432-ADCCF0B9F2D7}"
-    
+
     ' Web Sites
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\Namespace\{B28AA736-876B-46DA-B3A8-84C5E30BA492}"
     RegDeleteKey HKLM, "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\NetworkNeighborhood\Namespace\{46137B78-0EC3-426D-8B89-FF7C3A458B5E}"
@@ -1821,7 +1821,7 @@ End Sub 'ClearShellIntegrationReg
 'Clean out known typelib registration
 Sub RegWipeTypeLib
 
-    
+
     Dim hDefKey, sSubKeyName, sKey, sTLKey, sTLVerKey
     Dim sTypeLibs, tl, k, sValue, sFilePath
     Dim arrTypeLibs, arrKeys, arrKeys2
@@ -1847,7 +1847,7 @@ Sub RegWipeTypeLib
                         'get the safe filepath
                         sFilePath = Left(sValue, InstrRev(sValue, ".") + 3)
                         LogOnly "Found filepath: " & sValue & " - using filepath: " & sFilePath
-                        If oFso.FileExists(sFilePath) Then 
+                        If oFso.FileExists(sFilePath) Then
                             fCanDelete = False
                             fClearTL = False
                             LogOnly "File target still in use. TypeLib registration will persisted."
@@ -1861,7 +1861,7 @@ Sub RegWipeTypeLib
                         'get the safe filepath
                         sFilePath = Left(sValue, InstrRev(sValue, ".") + 3)
                         LogOnly "Found filepath: " & sValue & " - using filepath: " & sFilePath
-                        If oFso.FileExists(sFilePath) Then 
+                        If oFso.FileExists(sFilePath) Then
                             fCanDelete = False
                             fClearTL = False
                             LogOnly "File target still in use. TypeLib registration will persisted."
@@ -1875,7 +1875,7 @@ Sub RegWipeTypeLib
                         'get the safe filepath
                         sFilePath = Left(sValue, InstrRev(sValue, ".") + 3)
                         LogOnly "Found filepath: " & sValue & " - using filepath: " & sFilePath
-                        If oFso.FileExists(sFilePath) Then 
+                        If oFso.FileExists(sFilePath) Then
                             fCanDelete = False
                             fClearTL = False
                             LogOnly "File target still in use. TypeLib registration will persisted."
@@ -1889,7 +1889,7 @@ Sub RegWipeTypeLib
                         'get the safe filepath
                         sFilePath = Left(sValue, InstrRev(sValue, ".") + 3)
                         LogOnly "Found filepath: " & sValue & " - using filepath: " & sFilePath
-                        If oFso.FileExists(sFilePath) Then 
+                        If oFso.FileExists(sFilePath) Then
                             fCanDelete = False
                             fClearTL = False
                             LogOnly "File target still in use. TypeLib registration will persisted."
@@ -1919,15 +1919,15 @@ End Sub 'RegWipeTypeLib
 '-------------------------------------------------------------------------------
 '   FileWipe
 '
-'   Removal of left behind services, files and shortcuts 
+'   Removal of left behind services, files and shortcuts
 '-------------------------------------------------------------------------------
 Sub FileWipe
     Dim scRoot
     Dim fDelFolders
-    
+
     If CBool(iError AND ERROR_USERCANCEL) Then Exit Sub
 
-    LogH1 "File Cleanup" 
+    LogH1 "File Cleanup"
 
     fDelFolders = False
     CloseOfficeApps
@@ -1940,18 +1940,18 @@ Sub FileWipe
 
     ' SP1 addition / change
     ' remove the ClickToRunSvc service
-    LogH2 "Delete ClickToRunSvc service" 
+    LogH2 "Delete ClickToRunSvc service"
     DeleteService "ClickToRunSvc"
 
     ' adding additional processes for termination
     dicApps.Add "explorer.exe", "explorer.exe"
     dicApps.Add "msiexec.exe", "msiexec.exe"
     dicApps.Add "ose.exe", "ose.exe"
-    
+
     If fC2R Then
 	    LogH1 "Delete Files and Folders"
         ' delete C2R package files
-        LogH2 "Delete C2R package files" 
+        LogH2 "Delete C2R package files"
         If oFso.FolderExists(sProgramFiles & "\Microsoft Office 15") _
         Or oFso.FolderExists(sProgramFiles & "\Microsoft Office 16") _
         Or oFso.FolderExists(oWShell.ExpandEnvironmentStrings("%programfiles%") & "\Microsoft Office\PackageManifests") _
@@ -1966,7 +1966,7 @@ Sub FileWipe
         LogH2 "Delete Office folders"
         DeleteFolder sProgramFiles & "\Microsoft Office 15"
         DeleteFolder sProgramFiles & "\Microsoft Office 16"
-        If f64 Then 
+        If f64 Then
         	DeleteFolder sCommonProgramFilesX86 & "\Microsoft Office 15"
         	DeleteFolder sCommonProgramFilesX86 & "\Microsoft Office 16"
         End If
@@ -1976,7 +1976,7 @@ Sub FileWipe
         	DeleteFolder sProgramFiles & "\Microsoft Office\root"
         	DeleteFile sProgramFiles & "\Microsoft Office\AppXManifest.xml"
          	DeleteFile sProgramFiles & "\Microsoft Office\FileSystemMetadata.xml"
-        	If Not dicKeepSku.Count > 0 Then 
+        	If Not dicKeepSku.Count > 0 Then
         		DeleteFolder sProgramFiles & "\Microsoft Office\Office16"
         		DeleteFolder sProgramFiles & "\Microsoft Office\Office15"
         	End If
@@ -1986,13 +1986,13 @@ Sub FileWipe
 	        	DeleteFolder sProgramFilesX86 & "\Microsoft Office\root"
 	        	DeleteFile sProgramFilesX86 & "\Microsoft Office\AppXManifest.xml"
 	         	DeleteFile sProgramFilesX86 & "\Microsoft Office\FileSystemMetadata.xml"
-	        	If Not dicKeepSku.Count > 0 Then 
+	        	If Not dicKeepSku.Count > 0 Then
 	        		DeleteFolder sProgramFilesX86 & "\Microsoft Office\Office16"
 	        		DeleteFolder sProgramFilesX86 & "\Microsoft Office\Office15"
 	        	End If
        		End If
 		End If
-        
+
         DeleteFolder sProgramData & "\Microsoft\ClickToRun"
         DeleteFolder sCommonProgramFiles & "\microsoft shared\ClickToRun"
         DeleteFolder sProgramData & "\Microsoft\office\FFPackageLocker"
@@ -2028,7 +2028,7 @@ End Sub ' FileWipe
 '-------------------------------------------------------------------------------
 '   CleanShortcuts
 '
-'   Recursively search all profile folders for Office shortcuts in scope 
+'   Recursively search all profile folders for Office shortcuts in scope
 '-------------------------------------------------------------------------------
 Sub CleanShortcuts (sFolder, fDelete, fUnPin)
     Dim oFolder, fld, file, sc, item
@@ -2036,7 +2036,7 @@ Sub CleanShortcuts (sFolder, fDelete, fUnPin)
     Dim sCmdLine, sReturn
 
 	If fSkipSD Then Exit Sub
-	
+
 	Set oFolder = oFso.GetFolder(sFolder)
 	' exclude system protected link folders
     If CBool(oFolder.Attributes AND 1024) Then Exit Sub
@@ -2082,9 +2082,9 @@ Sub CleanShortcuts (sFolder, fDelete, fUnPin)
                     End If
                 End If
             End If
-            If fDeleteSC Then 
+            If fDeleteSC Then
                 If NOT dicDelFolder.Exists(sFolder) Then dicDelFolder.Add sFolder, sFolder
-                If fUnPin OR fDelete Then 
+                If fUnPin OR fDelete Then
                     If oFso.FileExists(sc.TargetPath) Then
                     Else
                         sc.TargetPath = sNotepad
@@ -2112,7 +2112,7 @@ End Sub 'CleanShortcuts
 '-------------------------------------------------------------------------------
 '   UnPin
 '
-'   Unpins a shortcut from the taskbar or start menu 
+'   Unpins a shortcut from the taskbar or start menu
 '-------------------------------------------------------------------------------
 Sub UnPin(sFilePath)
     Dim fldItem, verb, file
@@ -2203,7 +2203,7 @@ End Sub
 '-------------------------------------------------------------------------------
 '   ClearOfficeHKLM
 '
-'   Recursively search and clear the HKLM Office key from references in scope 
+'   Recursively search and clear the HKLM Office key from references in scope
 '-------------------------------------------------------------------------------
 Sub ClearOfficeHKLM (sSubKeyName)
     Dim key, name
@@ -2217,7 +2217,7 @@ Sub ClearOfficeHKLM (sSubKeyName)
             ClearOfficeHKLM sSubKeyName & "\" & key
         Next 'key
     End If
-    
+
     ' identify & clear removable entries
     If RegEnumValues(HKLM, sSubKeyName, arrNames, arrTypes) Then
         For Each name in arrNames
@@ -2226,7 +2226,7 @@ Sub ClearOfficeHKLM (sSubKeyName)
             End If
         Next 'item
     End If
-    
+
     ' clear out empty keys
     If (NOT RegEnumValues(HKLM, sSubKeyName, arrNames, arrTypes)) AND _
        (NOT RegEnumKey(HKLM, sSubKeyName, arrKeys)) AND _
@@ -2256,11 +2256,11 @@ Function IsC2R (sValue)
 	Const OCOMMON		  = "\microsoft shared\ClickToRun"
 	Const OMANIFEST		  = "\Microsoft Office\PackageManifests"
 	Const OSUNRISE		  = "\Microsoft Office\PackageSunrisePolicies"
-	
+
 	Dim fReturn
-	
+
 	fReturn = False
-	
+
     If InStr(LCase(sValue), LCase(OREF)) > 0 _
     Or InStr(LCase(sValue), LCase(OREFROOT)) > 0 _
     Or InStr(LCase(sValue), LCase(OCOMMON)) > 0 _
@@ -2268,14 +2268,14 @@ Function IsC2R (sValue)
     Or InStr(LCase(sValue), LCase(OSUNRISE)) > 0 _
     Or InStr(LCase(sValue), LCase(OREGREFC2R15)) > 0 _
     Or InStr(LCase(sValue), LCase(OREGREFC2R16)) > 0 Then fReturn = True
-    
+
 	IsC2R = fReturn
 End Function
 
 '-------------------------------------------------------------------------------
 '   CheckRegPermissions
 '
-'   Test the permissions on some key registry locations to determine if 
+'   Test the permissions on some key registry locations to determine if
 '   sufficient permissions are given.
 '-------------------------------------------------------------------------------
 Function CheckRegPermissions
@@ -2342,7 +2342,7 @@ Function Delimiter (sVersion)
     Delimiter = " "
     For iCnt = 1 To Len(sVersion)
         iAsc = Asc(Mid(sVersion, iCnt, 1))
-        If Not (iASC >= 48 And iASC <= 57) Then 
+        If Not (iASC >= 48 And iASC <= 57) Then
             Delimiter = Mid(sVersion, iCnt, 1)
             Exit Function
         End If
@@ -2389,13 +2389,13 @@ End Function 'GetExpandedGuid
 Function GetCompressedGuid (sGuid)
     Dim sCompGUID
     Dim i
-    
+
     'Ensure Valid Length
     If NOT Len(sGuid) = 38 Then Exit Function
 
     sCompGUID = StrReverse(Mid(sGuid, 2, 8))  & _
                 StrReverse(Mid(sGuid, 11, 4)) & _
-                StrReverse(Mid(sGuid, 16, 4)) 
+                StrReverse(Mid(sGuid, 16, 4))
     For i = 21 To 24
 	    If i Mod 2 Then
 		    sCompGUID = sCompGUID & Mid(sGuid, (i + 1), 1)
@@ -2469,12 +2469,12 @@ End Function 'GetDecodedGuid
 '   Convert a long decimal to hex
 '-------------------------------------------------------------------------------
 Function DecToHex(lDec)
-    
+
     Dim sHex
     Dim iLen
     Dim lVal, lExp
     Dim arrChr
-  
+
     arrChr = Array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F")
     sHex = ""
     lVal = lDec
@@ -2560,13 +2560,13 @@ Sub RelaunchElevated
         Next 'Argument
     End If
     ' prep work to get the return value from the elevated process
-    iParentProcessId = GetMyProcessId 
-    
+    iParentProcessId = GetMyProcessId
+
 '    ' make user aware of elevation attempt after reboot
 '    If RegReadValue(HKCU, "SOFTWARE\Microsoft\Office\15.0\CleanC2R", "Rerun", sValue, "REG_DWORD") Then
 '        oWShell.Popup "System reboot complete. OffScrub will now prompt for elevation!", 10, SCRIPTNAME & " - NOTE!"
 '    End If
-    
+
     ' launch the elevated instance
     oShell.ShellExecute "cscript.exe", sCmdLine & " /NoElevate UAC", "", "runas", 1
     ' get the process id of the spawned instance
@@ -2612,14 +2612,14 @@ Sub RelaunchAsCScript
         Next 'Argument
     End If
     sCmdLine = sCmdLine  &  " " & chr(34) & "/ChangedScriptHost" & chr(34)
-    
+
     If NOT fQuietNoCScript Then Wscript.Quit CLng(oWShell.Run(sCmdLine, 1, True))
 End Sub 'RelaunchAsCScript
 
 '-------------------------------------------------------------------------------
 '   SetError
 '
-'   Set error bit(s) 
+'   Set error bit(s)
 '-------------------------------------------------------------------------------
 Sub SetError(ErrorBit)
     iError = iError OR ErrorBit
@@ -2632,7 +2632,7 @@ End Sub
 '-------------------------------------------------------------------------------
 '   ClearError
 '
-'   Unset error bit(s) 
+'   Unset error bit(s)
 '-------------------------------------------------------------------------------
 Sub ClearError(ErrorBit)
     iError = iError AND (ERROR_ALL - ErrorBit)
@@ -2649,9 +2649,9 @@ End Sub
 '-------------------------------------------------------------------------------
 Sub SetRetVal(iError)
     Dim RetValFileStream
-    
+
     'don't fail script execution if writing the return value to file fails
-    On Error Resume Next 
+    On Error Resume Next
 
     Set RetValFileStream = oFso.createTextFile(sScrubDir & "\" & RETVALFILE, True, True)
     RetValFileStream.Write iError
@@ -2690,7 +2690,7 @@ End Function 'GetRetValFromFile
 Sub CreateLog
     Dim DateTime
     Dim sLogName
-    
+
     On Error Resume Next
     ' create the log file
     Set DateTime = CreateObject("WbemScripting.SWbemDateTime")
@@ -2700,7 +2700,7 @@ Sub CreateLog
     sLogName = sLogName & "_ScrubLog.txt"
     Err.Clear
     Set LogStream = oFso.CreateTextFile(sLogName, True, True)
-    If Err <> 0 Then 
+    If Err <> 0 Then
         Err.Clear
         sLogDir = sScrubDir
         sLogName = sLogDir & "\" & oWShell.ExpandEnvironmentStrings("%COMPUTERNAME%")
@@ -2713,7 +2713,7 @@ Sub CreateLog
     LogH2 "Microsoft Customer Support Services - " & ONAME & " Removal Utility" & vbCrLf & vbCrLf & _
         	"Version: " & vbTab & SCRIPTVERSION & vbCrLf & _
         	"64 bit OS: " & vbTab & f64 & vbCrLf & _
-        	"Removal start: " & vbTab & Time 
+        	"Removal start: " & vbTab & Time
     LogH2	"OS Details: " & sOSinfo & vbCrLf
     fLogInitialized = True
 End Sub 'CreateLog
@@ -2756,9 +2756,9 @@ Function RegValExists(hDefKey, sSubKeyName, sName)
     RegValExists = False
     If Not RegKeyExists(hDefKey, sSubKeyName) Then Exit Function
     If oReg.EnumValues(hDefKey, sSubKeyName, arrValueNames, arrValueTypes) = 0 AND IsArray(arrValueNames) Then
-        For i = 0 To UBound(arrValueNames) 
+        For i = 0 To UBound(arrValueNames)
             If LCase(arrValueNames(i)) = Trim(LCase(sName)) Then RegValExists = True
-        Next 
+        Next
     End If 'oReg.EnumValues
 End Function
 
@@ -2772,7 +2772,7 @@ Function RegReadValue(hDefKey, sSubKeyName, sName, sValue, sType)
     Dim RetVal
     Dim Item
     Dim arrValues
-    
+
     Select Case UCase(sType)
         Case "1", "REG_SZ"
             RetVal = oReg.GetStringValue(hDefKey, sSubKeyName, sName, sValue)
@@ -2793,7 +2793,7 @@ Function RegReadValue(hDefKey, sSubKeyName, sName, sValue, sType)
         Case Else
             RetVal = -1
     End Select 'sValue
-    
+
     RegReadValue = (RetVal = 0)
 End Function 'RegReadValue
 
@@ -2805,19 +2805,19 @@ End Function 'RegReadValue
 Function RegEnumValues(hDefKey, sSubKeyName, arrNames, arrTypes)
     Dim RetVal, RetVal64
     Dim arrNames32, arrNames64, arrTypes32, arrTypes64
-    
+
     If f64 Then
         RetVal = oReg.EnumValues(hDefKey, sSubKeyName, arrNames32, arrTypes32)
         RetVal64 = oReg.EnumValues(hDefKey, Wow64Key(hDefKey, sSubKeyName), arrNames64, arrTypes64)
-        If (RetVal = 0) AND (NOT RetVal64 = 0) AND IsArray(arrNames32) AND IsArray(arrTypes32) Then 
+        If (RetVal = 0) AND (NOT RetVal64 = 0) AND IsArray(arrNames32) AND IsArray(arrTypes32) Then
             arrNames = arrNames32
             arrTypes = arrTypes32
         End If
-        If (NOT RetVal = 0) AND (RetVal64 = 0) AND IsArray(arrNames64) AND IsArray(arrTypes64) Then 
+        If (NOT RetVal = 0) AND (RetVal64 = 0) AND IsArray(arrNames64) AND IsArray(arrTypes64) Then
             arrNames = arrNames64
             arrTypes = arrTypes64
         End If
-        If (RetVal = 0) AND (RetVal64 = 0) AND IsArray(arrNames32) AND IsArray(arrNames64) AND IsArray(arrTypes32) AND IsArray(arrTypes64) Then 
+        If (RetVal = 0) AND (RetVal64 = 0) AND IsArray(arrNames32) AND IsArray(arrNames64) AND IsArray(arrTypes32) AND IsArray(arrTypes64) Then
             arrNames = RemoveDuplicates(Split((Join(arrNames32, "\") & "\" & Join(arrNames64, "\")), "\"))
             arrTypes = RemoveDuplicates(Split((Join(arrTypes32, "\") & "\" & Join(arrTypes64, "\")), "\"))
         End If
@@ -2835,14 +2835,14 @@ End Function 'RegEnumValues
 Function RegEnumKey(hDefKey, sSubKeyName, arrKeys)
     Dim RetVal, RetVal64
     Dim arrKeys32, arrKeys64
-    
+
     If f64 Then
         RetVal = oReg.EnumKey(hDefKey, sSubKeyName, arrKeys32)
         RetVal64 = oReg.EnumKey(hDefKey, Wow64Key(hDefKey, sSubKeyName), arrKeys64)
         If (RetVal = 0) AND (NOT RetVal64 = 0) AND IsArray(arrKeys32) Then arrKeys = arrKeys32
         If (Not RetVal = 0) AND (RetVal64 = 0) AND IsArray(arrKeys64) Then arrKeys = arrKeys64
-        If (RetVal = 0) AND (RetVal64 = 0) Then 
-            If IsArray(arrKeys32) AND IsArray (arrKeys64) Then 
+        If (RetVal = 0) AND (RetVal64 = 0) Then
+            If IsArray(arrKeys32) AND IsArray (arrKeys64) Then
                 arrKeys = RemoveDuplicates(Split((Join(arrKeys32, "\") & "\" & Join(arrKeys64, "\")), "\"))
             ElseIf IsArray(arrKeys64) Then
                 arrKeys = arrKeys64
@@ -2865,7 +2865,7 @@ Sub RegDeleteValue(hDefKey, sSubKeyName, sName, fRegMultiSZ)
     Dim sDelKeyName, sValue
     Dim iRetVal
     Dim fKeep
-    
+
     ' ensure trailing "\"
     sSubKeyName = sSubKeyName & "\"
     While InStr(sSubKeyName, "\\") > 0
@@ -2878,13 +2878,13 @@ Sub RegDeleteValue(hDefKey, sSubKeyName, sName, fRegMultiSZ)
         LogOnly "Disallowing the delete of still required keypath element: " & HiveString(hDefKey) & "\" & sSubKeyName & sName
         If NOT fForce Then Exit Sub
     End If
-    
+
     ' check on forced delete
     If fKeep Then
         LogOnly "Enforced delete of still required keypath element: " & HiveString(hDefKey) & "\" & sSubKeyName & sName
         LogOnly "   Remaining applications will need a repair!"
     End If
-    
+
     ' ensure value exists
     If RegValExists(hDefKey, sSubKeyName, sName) Then
         sDelKeyName = sSubKeyName
@@ -2900,9 +2900,9 @@ Sub RegDeleteValue(hDefKey, sSubKeyName, sName, fRegMultiSZ)
         LogOnly "Disallowing unsafe delete of REG_MULTI_SZ: " & HiveString(hDefKey) & "\" & sDelKeyName & sName
         Exit Sub
     End If
-    
+
     ' execute delete operation
-    If Not fDetectOnly Then 
+    If Not fDetectOnly Then
         LogOnly "Delete registry value: " & HiveString(hDefKey) & "\" & sDelKeyName & " -> " & sName
         iRetVal = 0
         iRetVal = oReg.DeleteValue(hDefKey, sDelKeyName, sName)
@@ -2926,7 +2926,7 @@ End Sub 'RegDeleteValue
 Sub RegDeleteKey(hDefKey, sSubKeyName)
     Dim sDelKeyName
     Dim fKeep
-    
+
     ' ensure trailing "\"
     sSubKeyName = sSubKeyName & "\"
     While InStr(sSubKeyName, "\\") > 0
@@ -2939,18 +2939,18 @@ Sub RegDeleteKey(hDefKey, sSubKeyName)
         LogOnly "Disallowing the delete of still required keypath element: " & HiveString(hDefKey) & "\" & sSubKeyName
         If NOT fForce Then Exit Sub
     End If
-    
+
     ' check on forced delete
     If fKeep Then
         LogOnly "Enforced delete of still required keypath element: " & HiveString(hDefKey) & "\" & sSubKeyName
         LogOnly "   Remaining applications will need a repair!"
     End If
-    
+
     If Len(sSubKeyName) > 1 Then
         'Strip of trailing "\"
         sSubKeyName = Left(sSubKeyName, Len(sSubKeyName) - 1)
     End If
-    
+
     ' ensure key exists
     If RegKeyExists(hDefKey, sSubKeyName) Then
         sDelKeyName = sSubKeyName
@@ -2977,7 +2977,7 @@ End Sub 'RegDeleteKey
 '
 '   Recursively delete a registry structure
 '-------------------------------------------------------------------------------
-Sub RegDeleteKeyEx(hDefKey, sSubKeyName) 
+Sub RegDeleteKeyEx(hDefKey, sSubKeyName)
     Dim arrSubkeys
     Dim sSubkey
     Dim iRetVal
@@ -2996,12 +2996,12 @@ Sub RegDeleteKeyEx(hDefKey, sSubKeyName)
 
     ' regular recursion
     oReg.EnumKey hDefKey, sSubKeyName, arrSubkeys
-    If IsArray(arrSubkeys) Then 
-        For Each sSubkey In arrSubkeys 
-            RegDeleteKeyEx hDefKey, sSubKeyName & "\" & sSubkey 
-        Next 
-    End If 
-    If Not fDetectOnly Then 
+    If IsArray(arrSubkeys) Then
+        For Each sSubkey In arrSubkeys
+            RegDeleteKeyEx hDefKey, sSubKeyName & "\" & sSubkey
+        Next
+    End If
+    If Not fDetectOnly Then
         iRetVal = 0
         iRetVal = oReg.DeleteKey(hDefKey, sSubKeyName)
         If NOT (iRetVal = 0) Then LogOnly "     Delete failed. Return value: "&iRetVal
@@ -3045,7 +3045,7 @@ End Function 'Wow64Key
 Function RemoveDuplicates(Array)
     Dim Item
     Dim dicNoDupes
-    
+
     Set dicNoDupes = CreateObject("Scripting.Dictionary")
     For Each Item in Array
         If Not dicNoDupes.Exists(Item) Then dicNoDupes.Add Item, Item
@@ -3059,7 +3059,7 @@ End Function 'RemoveDuplicates
 '   Checks the status of 'Err' and logs the error details if <> 0
 '-------------------------------------------------------------------------------
 Sub CheckError(sModule)
-    If Err <> 0 Then 
+    If Err <> 0 Then
         LogOnly "   Error: " & sModule & " - Source: " & Err.Source & "; Err# (Hex): " & Hex( Err ) & _
                "; Err# (Dec): " & Err & "; Description : " & Err.Description
     End If 'Err = 0
@@ -3140,15 +3140,15 @@ Sub LogPipe (sLog)
 	On Error Resume Next
 	'wscript.Echo "Here"
 	'wscript.Echo sLog
-	
-	
+
+
     Set fs = CreateObject("Scripting.FileSystemObject")
 	Set pipeStream = fs.CreateTextFile("\\.\pipe\offscrub_pipe", True)
 	pipeStream.WriteLine(sLog)
 	pipeStream.Close()
     WScript.Sleep 5000
-	
-	If Err <> 0 Then 
+
+	If Err <> 0 Then
         'wscript.Echo Err.Source
         'wscript.echo Err.Description
         'Wscript.Quit
@@ -3164,9 +3164,9 @@ End Sub
 Function InScope(sProductCode)
     Dim fInScope
     Dim sProd
-	
+
 	Const OFFICEID = "0000000FF1CE}"
-	
+
 	On Error Resume Next
 
     fInScope = False
@@ -3176,12 +3176,12 @@ Function InScope(sProductCode)
         sProd = UCase(sProductCode)
         If Right(sProd, PRODLEN) = OFFICEID Then
         	'LogOnly "Pattern matches " & OFFICEID
-        	If CInt(Mid(sProd, 4, 2)) > 14 Then 
+        	If CInt(Mid(sProd, 4, 2)) > 14 Then
 	            If Err <> 0 Then
 	            	Err.Clear
 	            	Exit Function
 	            End If
-	            'LogOnly "VersionMajor confirmed to be > 14" 
+	            'LogOnly "VersionMajor confirmed to be > 14"
 	            Select Case Mid(sProd, 11, 4)
 	            Case "007E", "008F", "008C", "24E1", "237A", "00DD"
 	                'LogOnly "SKUFilter matches scope"
@@ -3211,11 +3211,11 @@ Function CheckDelete(sProductCode)
     CheckDelete = False
     ' ensure valid GUID length
     If NOT Len(sProductCode) = 38 Then Exit Function
-    ' only care if it's in the expected ProductCode pattern 
+    ' only care if it's in the expected ProductCode pattern
     If NOT InScope(sProductCode) Then Exit Function
     ' check if it's a known product that should be kept
     If dicKeepSku.Exists(UCase(sProductCode)) Then Exit Function
-    
+
     CheckDelete = True
 End Function 'CheckDelete
 
@@ -3229,13 +3229,13 @@ Sub DeleteService(sName)
     Dim Services, srvc, Processes, process
     Dim sQuery, sStates, sProcessName, sCmd
     Dim iRet
-    
+
     On Error Resume Next
-    
+
     sStates = "STARTED;RUNNING"
     sQuery = "Select * From Win32_Service Where Name='" & sName & "'"
     Set Services = oWmiLocal.Execquery(sQuery)
-    
+
     ' stop and delete the service
     For Each srvc in Services
         Log "   Found service " & sName & " (" & srvc.DisplayName & ") in state " & srvc.State
@@ -3251,7 +3251,7 @@ Sub DeleteService(sName)
         For Each process in Processes
             iRet = process.Terminate()
         Next 'Process
-        If fDetectOnly Then 
+        If fDetectOnly Then
             Log "   Not deleting service " & sName & " in preview mode"
             Exit Sub
         End If
@@ -3348,7 +3348,7 @@ Sub DeleteFile(sFile)
     Dim File, attr
     Dim sDelFile, sFileName, sNewPath
     Dim fKeep
-    
+
     On Error Resume Next
 
     fKeep = dicKeepFolder.Exists(LCase(sFile))
@@ -3372,7 +3372,7 @@ Sub DeleteFile(sFile)
         LogOnly "Path not found. Cannot not delete folder: " & sFile
         Exit Sub
     End If
-    If Not fDetectOnly Then 
+    If Not fDetectOnly Then
         LogOnly "Delete file: " & sDelFile
 		Set File = oFso.GetFile(sDelFile)
         ' ensure read-only flag is not set
@@ -3404,7 +3404,7 @@ Sub DeleteFolder(sFolder)
     Dim Folder, fld, attr
     Dim sDelFolder, sFolderName, sNewPath, sCmd
     Dim fKeep
-    
+
     ' ensure trailing "\"
     ' trailing \ is required for dicKeepFolder comparisons
     sFolder = sFolder & "\"
@@ -3425,22 +3425,22 @@ Sub DeleteFolder(sFolder)
         LogOnly "Enforced delete of still required keypath element: " & sFolder
         LogOnly "   Remaining applications will need a repair!"
     End If
-    
+
     ' strip trailing "\"
     If Len(sFolder) > 1 Then
         sFolder = Left(sFolder, Len(sFolder) - 1)
     End If
 
     On Error Resume Next
-    If oFso.FolderExists(sFolder) Then 
+    If oFso.FolderExists(sFolder) Then
         sDelFolder = sFolder
-    ElseIf f64 AND oFso.FolderExists(Wow64Folder(sFolder)) Then 
+    ElseIf f64 AND oFso.FolderExists(Wow64Folder(sFolder)) Then
         sDelFolder = Wow64Folder(sFolder)
     Else
         LogOnly "Path not found. Cannot not delete folder: " & sFolder
         Exit Sub
     End If
-    If Not fDetectOnly Then 
+    If Not fDetectOnly Then
         LogOnly "Delete folder: " & sDelFolder
         Set Folder = oFso.GetFolder(sDelFolder)
         ' ensure to remove read only flag
@@ -3454,12 +3454,12 @@ Sub DeleteFolder(sFolder)
         sCmd = "cmd.exe /c rd /s " & chr(34) & sDelFolder & chr(34) & " /q"
         oWShell.Run sCmd, 0, True
         If NOT oFso.FolderExists(sDelFolder) Then Exit Sub
-        
+
         ' rd didn't work check with FileSystemObject
         Set Folder = oFso.GetFolder(sDelFolder)
         Folder.Delete True
         Set Folder = Nothing
-        
+
         ' error handling
         If Err <> 0 Then
             Select Case Err
@@ -3476,7 +3476,7 @@ Sub DeleteFolder(sFolder)
                     If NOT oFso.FolderExists(sDelFolder) Then Exit Sub
                 End If
 
-            Case 76 
+            Case 76
                 ' check on invalid path lengt issues Err 76 (0x4C) "Path not found"
                 ' attempt 'rd' command
                 CheckError "DeleteFolder"
@@ -3485,7 +3485,7 @@ Sub DeleteFolder(sFolder)
                 oWShell.Run sCmd, 0, True
                 If NOT oFso.FolderExists(sDelFolder) Then Exit Sub
             End Select
-            
+
             ' stil failed!
             Log "   Failed to delete folder: " & sDelFolder
             CheckError "DeleteFolder"
@@ -3533,9 +3533,9 @@ End Sub
 '   64 bit environments
 '-------------------------------------------------------------------------------
 Function Wow64Folder(sFolder)
-    If LCase(Left(sFolder, Len(sWinDir & "\System32"))) = LCase(sWinDir & "\System32") Then 
+    If LCase(Left(sFolder, Len(sWinDir & "\System32"))) = LCase(sWinDir & "\System32") Then
         Wow64Folder = sWinDir & "\syswow64" & Right(sFolder, Len(sFolder) - Len(sWinDir & "\System32"))
-    ElseIf LCase(Left(sFolder, Len(sProgramFiles))) = LCase(sProgramFiles) Then 
+    ElseIf LCase(Left(sFolder, Len(sProgramFiles))) = LCase(sProgramFiles) Then
         Wow64Folder = sProgramFilesX86 & Right(sFolder, Len(sFolder) - Len(sProgramFiles))
     Else
         Wow64Folder = "?" 'Return invalid string to ensure the folder cannot exist
@@ -3557,7 +3557,7 @@ End Sub 'ScheduleDeleteFile
 '-------------------------------------------------------------------------------
 '   ScheduleDeleteFolder
 '
-'   Recursively adds a folder and its contents to the list of 
+'   Recursively adds a folder and its contents to the list of
 '   items to delete on reboot
 '-------------------------------------------------------------------------------
 Sub ScheduleDeleteFolder (sFolder)
@@ -3595,7 +3595,7 @@ Sub ScheduleDeleteEx ()
     hDefKey = HKLM
     sKeyName = "SYSTEM\CurrentControlSet\Control\Session Manager"
     sValueName = "PendingFileRenameOperations"
-    
+
     LogH2 "Add " & dicDelInUse.Count & " PendingFileRenameOperations"
     If NOT RegValExists(hDefKey, sKeyName, sValueName) Then
         ReDim arrData(-1)
@@ -3620,12 +3620,12 @@ End Sub 'ScheduleDeleteEx
 '-------------------------------------------------------------------------------
 Sub DeleteEmptyFolder (sFolder)
     Dim Folder
-    
+
     ' cosmetic' task don't fail on error
     On Error Resume Next
     If oFso.FolderExists(sFolder) Then
         Set Folder = oFso.GetFolder(sFolder)
-        If (Folder.Subfolders.Count = 0) AND (Folder.Files.Count = 0) Then 
+        If (Folder.Subfolders.Count = 0) AND (Folder.Files.Count = 0) Then
             Set Folder = Nothing
             SmartDeleteFolder sFolder
         End If
@@ -3642,19 +3642,19 @@ End Sub 'DeleteEmptyFolders
 Sub DeleteEmptyFolders
     Dim Folder
     Dim sFolder
-    
+
     ' cosmetic' task don't fail on error
     On Error Resume Next
     DeleteEmptyFolder sCommonProgramFiles & "\Microsoft Shared\Office15"
     DeleteEmptyFolder sCommonProgramFiles & "\Microsoft Shared\Office16"
-    DeleteEmptyFolder sCommonProgramFiles & "\Microsoft Shared\" 
+    DeleteEmptyFolder sCommonProgramFiles & "\Microsoft Shared\"
     DeleteEmptyFolder sProgramFiles & "\Microsoft Office\Office15"
     DeleteEmptyFolder sProgramFiles & "\Microsoft Office\Office16"
-    
+
     For Each sFolder in dicDelFolder.Keys
         If oFso.FolderExists(sFolder) Then
             Set Folder = oFso.GetFolder(sFolder)
-            If (Folder.Subfolders.Count = 0) AND (Folder.Files.Count = 0) Then 
+            If (Folder.Subfolders.Count = 0) AND (Folder.Files.Count = 0) Then
                 Set Folder = Nothing
                 SmartDeleteFolder sFolder
             End If
@@ -3695,7 +3695,7 @@ End Sub 'SmartDeleteFolder
 '-------------------------------------------------------------------------------
 Sub SmartDeleteFolderEx(sFolder)
     Dim Folder
-    
+
     On Error Resume Next
     DeleteFolder sFolder : CheckError "SmartDeleteFolderEx"
     On Error Goto 0
@@ -3711,12 +3711,12 @@ End Sub 'SmartDeleteFolderEx
 Sub RestoreExplorer
     Dim Processes, Result, oAT, DateTime, JobID
     Dim sCmd
-    
+
     'Non critical routine. Don't fail on error
     On Error Resume Next
     wscript.sleep 1000
     Set Processes = oWmiLocal.ExecQuery("Select * From Win32_Process Where Name='explorer.exe'")
-    If Processes.Count < 1 Then 
+    If Processes.Count < 1 Then
         oWShell.Run "explorer.exe"
         'To handle this in case of System context, schedule and run as interactive task
         oWShell.Run "SCHTASKS /Create /TN OffScrEx /TR explorer /SC ONCE /ST 12:00 /IT", 0, True

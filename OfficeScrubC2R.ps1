@@ -1006,8 +1006,10 @@ function Main {
     }
 }
 
-# Execute main function
-$exitCode = Main
-exit $exitCode
+# Execute main function only if script is run directly (not dot-sourced)
+if ($MyInvocation.InvocationName -ne '.') {
+    $exitCode = Main
+    exit $exitCode
+}
 
 #endregion

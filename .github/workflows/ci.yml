@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test Module
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PowerShell
+        shell: pwsh
+        run: |
+          $PSVersionTable
+
+      - name: Build native DLL
+        shell: pwsh
+        run: |
+          .\build.ps1 -Clean
+          if (-not (Test-Path ".\OfficeScrubNative.dll")) {
+            throw "DLL was not created"
+          }
+
+      - name: Test module import
+        shell: pwsh
+        run: |
+          Import-Module .\OfficeScrubC2R.psd1 -Force -Verbose
+          Get-Module OfficeScrubC2R
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
+          if ($results) {
+            $results | Format-Table -AutoSize
+            throw "PSScriptAnalyzer found issues"
+          }
+
+      - name: Test module functions
+        shell: pwsh
+        run: |
+          Import-Module .\OfficeScrubC2R.psd1 -Force
+
+          # Test function availability
+          $commands = Get-Command -Module OfficeScrubC2R
+          Write-Host "Available commands: $($commands.Name -join ', ')"
+
+          # Test detection only (safe to run in CI)
+          # Note: This requires admin but we'll catch the error
+          try {
+            Get-InstalledOfficeProducts -ErrorAction Stop
+          }
+          catch {
+            Write-Host "Expected error (no admin): $_"
+          }
+
+      - name: Validate manifest
+        shell: pwsh
+        run: |
+          $manifest = Test-ModuleManifest -Path .\OfficeScrubC2R.psd1
+          Write-Host "Module version: $($manifest.Version)"
+          Write-Host "Module name: $($manifest.Name)"
+          Write-Host "PowerShell version: $($manifest.PowerShellVersion)"
+
+  validate:
+    name: Validate PowerShell Gallery Compatibility
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build DLL
+        shell: pwsh
+        run: .\build.ps1
+
+      - name: Test manifest
+        shell: pwsh
+        run: |
+          $manifest = Test-ModuleManifest -Path .\OfficeScrubC2R.psd1
+          if (-not $manifest) {
+            throw "Manifest validation failed"
+          }
+
+      - name: Check required files
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+            'OfficeScrubC2R.psd1',
+            'OfficeScrubC2R.psm1',
+            'OfficeScrubC2R-Utilities.psm1',
+            'OfficeScrubNative.dll',
+            'LICENSE',
+            'README.md'
+          )
+
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) {
+              throw "Required file missing: $file"
+            }
+          }
+
+      - name: Verify no blocked files
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -File | ForEach-Object {
+            if ((Get-Item $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue)) {
+              throw "Blocked file found: $($_.FullName)"
+            }
+          }

@@ -62,11 +62,33 @@ $script:Orchestrator = $null
 #region C# Type Loading
 
 function Initialize-NativeTypes {
+    # Try to load the pre-compiled DLL first
+    $dllPath = Join-Path $PSScriptRoot "OfficeScrubNative.dll"
+    
+    if (Test-Path $dllPath) {
+        try {
+            Add-Type -Path $dllPath -ErrorAction Stop
+            Write-Verbose "Native C# types loaded from DLL successfully"
+            return
+        }
+        catch {
+            if ($_.Exception.Message -notlike "*already exists*") {
+                Write-Warning "Failed to load DLL, falling back to source compilation: $_"
+            }
+            else {
+                Write-Verbose "Native C# types already loaded"
+                return
+            }
+        }
+    }
+    
+    # Fallback: compile from source
     $csharpPath = Join-Path $PSScriptRoot "OfficeScrubC2R-Native.cs"
     if (-not (Test-Path $csharpPath)) {
-        throw "C# helper file not found: $csharpPath"
+        throw "Neither DLL nor C# source file found. Expected: $dllPath or $csharpPath"
     }
 
+    Write-Verbose "Compiling C# source (DLL not found)"
     $csharpCode = Get-Content $csharpPath -Raw
 
     try {
@@ -104,7 +126,7 @@ function Initialize-NativeTypes {
         Add-Type -TypeDefinition $csharpCode -Language CSharp `
             -ReferencedAssemblies $assemblies -ErrorAction Stop
 
-        Write-Verbose "Native C# types loaded successfully"
+        Write-Verbose "Native C# types loaded from source successfully"
     }
     catch {
         if ($_.Exception.Message -notlike "*already exists*") {
@@ -126,7 +148,7 @@ function Initialize-Environment {
 
     # Initialize orchestrator
     $script:Is64Bit = [Environment]::Is64BitOperatingSystem
-    $script:Orchestrator = New-Object OfficeScrub.Native.OfficeScrubOrchestrator($script:Is64Bit)
+    $script:Orchestrator = New-Object OfficeScrubNative.OfficeScrubOrchestrator($script:Is64Bit)
 
     # Set environment paths
     $script:ProgramFiles = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
@@ -331,7 +353,7 @@ function Set-ReturnValue {
 function Get-RegistryValue {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey,
         [string]$ValueName,
         [object]$DefaultValue = $null
@@ -343,7 +365,7 @@ function Get-RegistryValue {
 function Set-RegistryValue {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey,
         [string]$ValueName,
         [object]$Value,
@@ -356,7 +378,7 @@ function Set-RegistryValue {
 function Remove-RegistryKey {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey,
         [switch]$Recursive = $true
     )
@@ -374,7 +396,7 @@ function Remove-RegistryKey {
 function Remove-RegistryValue {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey,
         [string]$ValueName
     )
@@ -392,7 +414,7 @@ function Remove-RegistryValue {
 function Get-RegistryKeys {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey
     )
 
@@ -402,7 +424,7 @@ function Get-RegistryKeys {
 function Get-RegistryValues {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey
     )
 
@@ -412,7 +434,7 @@ function Get-RegistryValues {
 function Test-RegistryKeyExists {
     [CmdletBinding()]
     param(
-        [OfficeScrub.Native.RegistryHiveType]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey
     )
 
@@ -501,7 +523,7 @@ function Stop-OfficeProcesses {
 
     Write-LogSubHeader "Stopping Office processes"
 
-    $processes = [OfficeScrub.Native.OfficeConstants]::OFFICE_PROCESSES
+    $processes = [OfficeScrubNative.OfficeConstants]::OFFICE_PROCESSES
     $terminated = $script:Orchestrator.Processes.TerminateProcesses($processes, 10000)
 
     if ($terminated.Count -gt 0) {
