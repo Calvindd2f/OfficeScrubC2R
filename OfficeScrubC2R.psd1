@@ -3,7 +3,7 @@
     RootModule             = 'OfficeScrubC2R.psm1'
 
     # Version number of this module.
-    ModuleVersion          = '2.19.1'
+    ModuleVersion          = '2.19.2'
 
     # Supported PSEditions
     CompatiblePSEditions   = @('Desktop', 'Core')
@@ -89,6 +89,7 @@ Requires Administrator privileges.
     FileList               = @(
         'OfficeScrubC2R.psd1',
         'OfficeScrubC2R.psm1',
+        'OfficeScrubC2R.ps1',
         'OfficeScrubC2R-Utilities.psm1',
         'OfficeScrubC2R-Native.cs',
         'OfficeScrubNative.dll',
