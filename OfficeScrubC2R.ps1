@@ -74,24 +74,30 @@ param(
     [string]$LogPath
 )
 
-# Import utility module
-Import-Module -Name (Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1") -Force
+# Import utility module only if not already loaded (for standalone execution)
+if (-not (Get-Module -Name OfficeScrubC2R-Utilities)) {
+    $utilitiesPath = Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1"
+    if (Test-Path $utilitiesPath) {
+        Import-Module -Name $utilitiesPath -Force -Global
+    }
+}
 
 #region Main Script Functions
 
 function Initialize-Script {
-    # Set script parameters FIRST (before any logging)
-    $script:Quiet = $Quiet
-    $script:DetectOnly = $DetectOnly
-    $script:Force = $Force
-    $script:RemoveAll = $RemoveAll
-    $script:KeepLicense = $KeepLicense
-    $script:Offline = $Offline
-    $script:ForceArpUninstall = $ForceArpUninstall
-    $script:ClearTaskBand = $ClearTaskBand
-    $script:UnpinMode = $UnpinMode
-    $script:SkipSD = $SkipSD
-    $script:NoElevate = $NoElevate
+    # Script-level variables are already set by wrapper function
+    # Only copy from parameters if they exist (when run standalone)
+    if ($PSBoundParameters.ContainsKey('Quiet')) { $script:Quiet = $Quiet }
+    if ($PSBoundParameters.ContainsKey('DetectOnly')) { $script:DetectOnly = $DetectOnly }
+    if ($PSBoundParameters.ContainsKey('Force')) { $script:Force = $Force }
+    if ($PSBoundParameters.ContainsKey('RemoveAll')) { $script:RemoveAll = $RemoveAll }
+    if ($PSBoundParameters.ContainsKey('KeepLicense')) { $script:KeepLicense = $KeepLicense }
+    if ($PSBoundParameters.ContainsKey('Offline')) { $script:Offline = $Offline }
+    if ($PSBoundParameters.ContainsKey('ForceArpUninstall')) { $script:ForceArpUninstall = $ForceArpUninstall }
+    if ($PSBoundParameters.ContainsKey('ClearTaskBand')) { $script:ClearTaskBand = $ClearTaskBand }
+    if ($PSBoundParameters.ContainsKey('UnpinMode')) { $script:UnpinMode = $UnpinMode }
+    if ($PSBoundParameters.ContainsKey('SkipSD')) { $script:SkipSD = $SkipSD }
+    if ($PSBoundParameters.ContainsKey('NoElevate')) { $script:NoElevate = $NoElevate }
 
     # Initialize error code
     $script:ErrorCode = $script:ERROR_SUCCESS
@@ -111,9 +117,9 @@ function Initialize-Script {
     }
 
     # Initialize logging (now $script:LogDir is properly set)
-    if ($LogPath) {
-        $script:LogDir = $LogPath
-        Initialize-Log $LogPath
+    if ($script:LogPath) {
+        $script:LogDir = $script:LogPath
+        Initialize-Log $script:LogPath
     }
     else {
         Initialize-Log $script:LogDir
@@ -442,17 +448,17 @@ function Uninstall-MSIProducts {
             foreach ($product in $inScopeProducts) {
                 Write-Log ("Call msiexec.exe to remove {0}" -f $product)
                 $logFile = Join-Path $script:LogDir "Uninstall_$product.log"
-                $args = @("/x$product", "REBOOT=ReallySuppress", "NOREMOVESPAWN=True")
+                $msiArgs = @("/x$product", "REBOOT=ReallySuppress", "NOREMOVESPAWN=True")
                 if ($script:Quiet) {
-                    $args += "/q"
+                    $msiArgs += "/q"
                 }
                 else {
-                    $args += "/qb-!"
+                    $msiArgs += "/qb-!"
                 }
-                $args += "/l*v"
-                $args += "`"$logFile`""
-                $msiexecArgsList += , @($product, $args, $logFile)
-                Write-LogOnly "Call msiexec with 'msiexec.exe $($args -join ' ')'"
+                $msiArgs += "/l*v"
+                $msiArgs += "`"$logFile`""
+                $msiexecArgsList += , @($product, $msiArgs, $logFile)
+                Write-LogOnly "Call msiexec with 'msiexec.exe $($msiArgs -join ' ')'"
             }
 
             Stop-OfficeProcesses
@@ -460,9 +466,9 @@ function Uninstall-MSIProducts {
             if (-not $script:DetectOnly) {
                 foreach ($item in $msiexecArgsList) {
                     $product = $item[0]
-                    $args = $item[1]
+                    $msiArgs = $item[1]
                     $logFile = $item[2]
-                    $result = Start-Process -FilePath "msiexec.exe" -ArgumentList $args -Wait -PassThru
+                    $result = Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait -PassThru
                     Write-Log ("msiexec returned: {0}" -f $result.ExitCode)
 
                     if ($result.ExitCode -eq 3010) {
@@ -484,20 +490,7 @@ function Uninstall-MSIProducts {
     }
 }
 
-function Test-ProductInScope {
-    param([string]$ProductCode)
-
-    # Simplified scope check - in real implementation, this would be more comprehensive
-    $productCodeLower = $ProductCode.ToLower()
-    $c2rPatterns = @("office", "o365", "clicktorun")
-
-    foreach ($pattern in $c2rPatterns) {
-        if ($productCodeLower -like "*$pattern*") {
-            return $true
-        }
-    }
-    return $false
-}
+# Note: Test-ProductInScope is provided by the utilities module via the Orchestrator
 
 # File removal is now handled in Complete-Cleanup to match VBS flow
 
@@ -930,8 +923,7 @@ function Show-Summary {
 
 function Main {
     try {
-        # Initialize script
-        Write-LogHeader "Initialization"
+        # Initialize script FIRST (sets up logging)
         if (-not (Initialize-Script)) {
             return $script:ERROR_SCRIPTINIT
         }

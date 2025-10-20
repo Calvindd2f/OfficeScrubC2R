@@ -33,6 +33,18 @@ $script:OSInfo = ""
 $script:LogStream = $null
 $script:LogDir = ""
 $script:ScrubDir = ""
+$script:Quiet = $false
+$script:DetectOnly = $false
+$script:Force = $false
+$script:RemoveAll = $false
+$script:KeepLicense = $false
+$script:Offline = $false
+$script:ForceArpUninstall = $false
+$script:ClearTaskBand = $false
+$script:UnpinMode = $false
+$script:SkipSD = $false
+$script:NoElevate = $false
+$script:LogPath = ""
 
 # Dictionaries
 $script:InstalledSku = @{}
@@ -143,6 +155,12 @@ function Initialize-Environment {
     [CmdletBinding()]
     param()
 
+    # Skip if already initialized
+    if ($null -ne $script:Orchestrator -and $script:ScrubDir) {
+        Write-Verbose "Environment already initialized, skipping..."
+        return
+    }
+
     # Load C# types
     Initialize-NativeTypes
 
@@ -205,8 +223,19 @@ function Test-IsElevated {
 function Initialize-Log {
     [CmdletBinding()]
     param(
-        [string]$LogPath = $script:LogDir
+        [string]$LogPath
     )
+
+    # Validate log path
+    if ([string]::IsNullOrWhiteSpace($LogPath)) {
+        if ([string]::IsNullOrWhiteSpace($script:LogDir)) {
+            Write-Warning "LogPath is empty. Using temp directory."
+            $LogPath = [System.IO.Path]::GetTempPath()
+        }
+        else {
+            $LogPath = $script:LogDir
+        }
+    }
 
     $computerName = $env:COMPUTERNAME
     $timestamp = Get-Date -Format "yyyyMMddHHmmss"

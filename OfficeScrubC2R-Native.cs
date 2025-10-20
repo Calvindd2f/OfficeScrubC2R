@@ -661,7 +661,7 @@ namespace OfficeScrubNative
                 using (var process = Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/c rd /s /q \"{directoryPath}\"",
+                    Arguments = "/c rd /s /q \"" + directoryPath + "\"",
                     UseShellExecute = false,
                     CreateNoWindow = true
                 }))
@@ -710,8 +710,8 @@ namespace OfficeScrubNative
 
                     // Then schedule directories
                     var dirs = Directory.GetDirectories(directoryPath, "*", SearchOption.AllDirectories)
-                                       .OrderByDescending(d => d.Length)
-                                       .ToList();
+                                    .OrderByDescending(d => d.Length)
+                                    .ToList();
 
                     foreach (var dir in dirs)
                     {
@@ -1175,7 +1175,7 @@ namespace OfficeScrubNative
                     // Check Win32 and Win64 paths
                     foreach (var platform in new[] { "0\\Win32", "9\\Win32", "0\\Win64", "9\\Win64" })
                     {
-                        var platformKey = $"{versionKey}\\{platform}";
+                        var platformKey = versionKey + "\\" + platform;
                         var filePath = _regHelper.GetValue(RegistryHiveType.LocalMachine,
                             platformKey, "", null) as string;
 
@@ -1224,7 +1224,7 @@ namespace OfficeScrubNative
                 scope.Connect();
 
                 var className = versionNT > 601 ? "SoftwareLicensingProduct" : "OfficeSoftwareProtectionProduct";
-                var queryString = $"SELECT ID, ApplicationId, PartialProductKey, Name, ProductKeyID FROM {className} WHERE ApplicationId = '{officeAppId}' AND PartialProductKey <> NULL";
+                var queryString = "SELECT ID, ApplicationId, PartialProductKey, Name, ProductKeyID FROM " + className + " WHERE ApplicationId = '" + officeAppId + "' AND PartialProductKey <> NULL";
                 var query = new SelectQuery(queryString);
 
                 using (var searcher = new ManagementObjectSearcher(scope, query))
@@ -1285,7 +1285,7 @@ namespace OfficeScrubNative
                 var scope = new ManagementScope("\\\\.\\root\\cimv2");
                 scope.Connect();
 
-                var queryString = $"SELECT * FROM Win32_Service WHERE Name LIKE '{serviceName}%'";
+                var queryString = "SELECT * FROM Win32_Service WHERE Name LIKE '" + serviceName + "%'";
                 var query = new SelectQuery(queryString);
 
                 using (var searcher = new ManagementObjectSearcher(scope, query))
@@ -1323,7 +1323,7 @@ namespace OfficeScrubNative
                     var psi = new ProcessStartInfo
                     {
                         FileName = "sc.exe",
-                        Arguments = $"delete {serviceName}",
+                        Arguments = "delete " + serviceName,
                         UseShellExecute = false,
                         CreateNoWindow = true
                     };
@@ -1375,7 +1375,7 @@ namespace OfficeScrubNative
                 return false;
 
             return OfficeConstants.C2R_PATTERNS.Any(pattern =>
-                path.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                path.IndexOf(pattern, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         public bool IsInScope(string productCode)

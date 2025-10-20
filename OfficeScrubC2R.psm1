@@ -176,24 +176,25 @@ function Invoke-OfficeScrubC2R {
     process {
         if ($PSCmdlet.ShouldProcess("Office Click-to-Run Products", "Remove")) {
             try {
-                # Build parameters for main script
-                $params = @{}
-                if ($Quiet) { $params['Quiet'] = $true }
-                if ($DetectOnly) { $params['DetectOnly'] = $true }
-                if ($Force) { $params['Force'] = $true }
-                if ($RemoveAll) { $params['RemoveAll'] = $true }
-                if ($KeepLicense) { $params['KeepLicense'] = $true }
-                if ($Offline) { $params['Offline'] = $true }
-                if ($ForceArpUninstall) { $params['ForceArpUninstall'] = $true }
-                if ($ClearTaskBand) { $params['ClearTaskBand'] = $true }
-                if ($UnpinMode) { $params['UnpinMode'] = $true }
-                if ($SkipSD) { $params['SkipSD'] = $true }
-                if ($NoElevate) { $params['NoElevate'] = $true }
-                if ($LogPath) { $params['LogPath'] = $LogPath }
+                # Set script-level variables for the main script functions
+                $script:Quiet = $Quiet
+                $script:DetectOnly = $DetectOnly
+                $script:Force = $Force
+                $script:RemoveAll = $RemoveAll
+                $script:KeepLicense = $KeepLicense
+                $script:Offline = $Offline
+                $script:ForceArpUninstall = $ForceArpUninstall
+                $script:ClearTaskBand = $ClearTaskBand
+                $script:UnpinMode = $UnpinMode
+                $script:SkipSD = $SkipSD
+                $script:NoElevate = $NoElevate
+                $script:LogPath = $LogPath
 
-                # Execute the main script
-                $mainScriptBlock = Join-Path $PSScriptRoot "OfficeScrubC2R.ps1"
-                & $mainScriptBlock @params
+                # Call Main function directly (script already dot-sourced)
+                $exitCode = Main
+                
+                # Return exit code
+                return $exitCode
             }
             catch {
                 Write-Error "Failed to execute OfficeScrubC2R: $_"
