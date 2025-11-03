@@ -3,6 +3,7 @@
 ## Directory Organization
 
 ### Root Level Files
+
 - **OfficeScrubC2R.psd1**: PowerShell module manifest with metadata and dependencies
 - **OfficeScrubC2R.psm1**: Main PowerShell module containing core functions
 - **OfficeScrubC2R-Utilities.psm1**: Nested utilities module with helper functions
@@ -12,12 +13,14 @@
 - **README.md**: Comprehensive project documentation and usage guide
 
 ### Configuration Files
+
 - **PSScriptAnalyzerSettings.psd1**: PowerShell code analysis configuration
 - **.gitignore**: Git version control exclusions
 - **.gitattributes**: Git file handling attributes
 - **LICENSE**: MIT license terms
 
 ### Documentation Structure
+
 ```
 docs/
 ├── BUILD.md              # Build instructions and requirements
@@ -32,6 +35,7 @@ docs/
 ```
 
 ### Development Infrastructure
+
 ```
 .github/
 ├── workflows/
@@ -42,6 +46,7 @@ docs/
 ```
 
 ### Testing and Help
+
 ```
 tests/
 └── Test-OfficeScrubC2R.ps1  # Module test suite
@@ -55,11 +60,13 @@ release/                     # Release artifacts directory
 ## Core Components
 
 ### PowerShell Module Layer
+
 - **Main Module (OfficeScrubC2R.psm1)**: Primary interface with exported functions
 - **Utilities Module**: Helper functions and common operations
 - **Module Manifest**: Metadata, dependencies, and export definitions
 
 ### Native C# Library
+
 - **RegistryHelper**: Win32 registry operations with WOW64 support
 - **FileHelper**: Optimized file/folder deletion with reboot scheduling
 - **ProcessHelper**: Process termination and monitoring
@@ -73,21 +80,25 @@ release/                     # Release artifacts directory
 ## Architectural Patterns
 
 ### Hybrid Architecture
+
 - PowerShell provides user interface and workflow orchestration
 - C# native library handles performance-critical operations
 - Smart fallback from pre-compiled DLL to source compilation
 
 ### Modular Design
+
 - Separation of concerns between PowerShell and C# layers
 - Nested module structure for utilities and helpers
 - Clear interface boundaries between components
 
 ### Performance Optimization
+
 - Native code for registry enumeration and file operations
 - Parallel processing capabilities for multi-threaded operations
 - Efficient GUID manipulation and pattern matching
 
 ### Error Handling Strategy
+
 - Comprehensive error codes for different failure scenarios
 - Detailed logging with operation tracing
 - Graceful degradation with fallback mechanisms
@@ -95,6 +106,7 @@ release/                     # Release artifacts directory
 ## Component Relationships
 
 ### Module Dependencies
+
 ```
 OfficeScrubC2R.psm1
 ├── Imports: OfficeScrubC2R-Utilities.psm1
@@ -103,6 +115,7 @@ OfficeScrubC2R.psm1
 ```
 
 ### Build Dependencies
+
 ```
 build.ps1
 ├── Compiles: OfficeScrubC2R-Native.cs
@@ -111,6 +124,7 @@ build.ps1
 ```
 
 ### Runtime Flow
+
 1. PowerShell module initialization
 2. Native DLL loading with fallback compilation
 3. Function export and alias registration

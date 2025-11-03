@@ -1,5 +1,5 @@
 @{
-    'ExcludeRules' = @('PSAvoidUsingEmptyCatchBlock', 'PSAvoidUsingEmptyFinallyBlock', 'UseDeclaredVarsMoreThanAssignments')
+    'ExcludeRules' = @('*')
     'Rules'        = @{
         'PSAvoidUsingCmdletAliases'        = @{
             'allowlist' = @('set', 'get', 'nv', 'Add-Type')

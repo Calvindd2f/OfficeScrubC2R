@@ -13,8 +13,8 @@ param(
     [switch]$FullCycle
 )
 
-# Import the utility module
-Import-Module -Name (Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1") -Force
+# Import the utility module  
+Import-Module -Name (Join-Path (Split-Path $PSScriptRoot -Parent) "OfficeScrubC2R.psd1") -Force
 
 function Test-OfficeDetection {
     Write-Host "Testing Office Detection Functions..." -ForegroundColor Green
@@ -46,7 +46,7 @@ function Test-OfficeDetection {
         Write-Host "  $key -> Exists: $exists" -ForegroundColor $(if ($exists) { "Green" } else { "Red" })
 
         if ($exists) {
-            $subKeys = Get-RegistrySubKeys -Hive LocalMachine -SubKey $key
+            $subKeys = Get-RegistryKeys -Hive LocalMachine -SubKey $key
             Write-Host "    SubKeys: $($subKeys.Count)" -ForegroundColor Cyan
         }
     }

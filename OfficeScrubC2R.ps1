@@ -78,7 +78,7 @@ param(
 if (-not (Get-Module -Name OfficeScrubC2R-Utilities)) {
     $utilitiesPath = Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1"
     if (Test-Path $utilitiesPath) {
-        Import-Module -Name $utilitiesPath -Force -Global
+        Import-Module -Name $utilitiesPath -Force
     }
 }
 
@@ -140,11 +140,11 @@ function Find-InstalledOfficeProducts {
 
     # Ensure Windows Installer metadata integrity
     Write-LogSubHeader "Ensure Windows Installer metadata integrity"
-    Ensure-ValidWIMetadata -Hive CurrentUser -SubKey "Software\Classes\Installer\Products" -ValidLength 32
-    Ensure-ValidWIMetadata -Hive ClassesRoot -SubKey "Installer\Products" -ValidLength 32
-    Ensure-ValidWIMetadata -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Products" -ValidLength 32
-    Ensure-ValidWIMetadata -Hive LocalMachine -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Components" -ValidLength 32
-    Ensure-ValidWIMetadata -Hive ClassesRoot -SubKey "Installer\Components" -ValidLength 32
+    Ensure-ValidWIMetadata -Hive ([OfficeScrubNative.RegistryHiveType]::CurrentUser) -SubKey "Software\Classes\Installer\Products" -ValidLength 32
+    Ensure-ValidWIMetadata -Hive ([OfficeScrubNative.RegistryHiveType]::ClassesRoot) -SubKey "Installer\Products" -ValidLength 32
+    Ensure-ValidWIMetadata -Hive ([OfficeScrubNative.RegistryHiveType]::LocalMachine) -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Products" -ValidLength 32
+    Ensure-ValidWIMetadata -Hive ([OfficeScrubNative.RegistryHiveType]::LocalMachine) -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Components" -ValidLength 32
+    Ensure-ValidWIMetadata -Hive ([OfficeScrubNative.RegistryHiveType]::ClassesRoot) -SubKey "Installer\Components" -ValidLength 32
 
     # Build list of installed Office products
     $script:InstalledSku = Get-InstalledOfficeProducts
@@ -164,7 +164,7 @@ function Find-InstalledOfficeProducts {
 
 function Ensure-ValidWIMetadata {
     param(
-        [Microsoft.Win32.RegistryHive]$Hive,
+        [OfficeScrubNative.RegistryHiveType]$Hive,
         [string]$SubKey,
         [int]$ValidLength
     )
@@ -989,9 +989,13 @@ function Main {
     }
     catch {
         Write-Log ("Fatal error: {0}" -f $_.Exception.Message)
-        Write-LogOnly ("Stack trace: {0}" -f $_.ScriptStackTrace)
+        if ($_.ScriptStackTrace) {
+            Write-LogOnly "Stack trace: $($_.ScriptStackTrace)"
+        }
         Set-ErrorCode $script:ERROR_UNKNOWN
-        Show-Summary
+        if ($null -ne $script:LogInitialized -and $script:LogInitialized) {
+            Show-Summary
+        }
         return $script:ERROR_UNKNOWN
     }
     finally {

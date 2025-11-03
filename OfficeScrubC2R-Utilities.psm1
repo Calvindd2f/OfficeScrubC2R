@@ -313,7 +313,8 @@ function Write-LogOnly {
 
     if ($script:LogStream) {
         $timestamp = Get-Date -Format "HH:mm:ss"
-        $script:LogStream.WriteLine("   {0}: {1}" -f $timestamp, $Message)
+        # Use direct string concatenation instead of format to avoid brace issues
+        $script:LogStream.WriteLine("   $timestamp : $Message")
     }
 }
 

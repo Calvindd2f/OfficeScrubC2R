@@ -9,7 +9,7 @@
 # Import the utilities module
 $utilitiesPath = Join-Path $PSScriptRoot "OfficeScrubC2R-Utilities.psm1"
 if (Test-Path $utilitiesPath) {
-    Import-Module $utilitiesPath -Force -Global
+    Import-Module $utilitiesPath -Force
 }
 else {
     throw "Required module not found: $utilitiesPath"
@@ -174,7 +174,18 @@ function Invoke-OfficeScrubC2R {
     }
 
     process {
-        if ($PSCmdlet.ShouldProcess("Office Click-to-Run Products", "Remove")) {
+        $shouldProceed = $true
+        if ($null -ne $PSCmdlet) {
+            try {
+                $shouldProceed = $PSCmdlet.ShouldProcess("Office Click-to-Run Products", "Remove")
+            }
+            catch {
+                # ShouldProcess not available, proceed anyway
+                $shouldProceed = $true
+            }
+        }
+        
+        if ($shouldProceed) {
             try {
                 # Set script-level variables for the main script functions
                 $script:Quiet = $Quiet

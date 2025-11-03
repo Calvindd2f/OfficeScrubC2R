@@ -46,43 +46,44 @@ Version 2.19.1 was incomplete due to missing main script file in the package. Al
 I've created an optimized version of your C# code with significant performance improvements:
 
 Key Optimizations:
+
 1. Memory Efficiency
-Used Span<char> and stackalloc for temporary string operations
+   Used Span<char> and stackalloc for temporary string operations
 
 Eliminated unnecessary StringBuilder allocations in GUID operations
 
 Reduced string concatenations and substring operations
 
 2. Collection Performance
-Changed arrays to HashSet<string> for O(1) lookups instead of O(n) searches
+   Changed arrays to HashSet<string> for O(1) lookups instead of O(n) searches
 
 Used StringComparer.OrdinalIgnoreCase for case-insensitive comparisons
 
 Pre-computed static collections for validation
 
 3. Registry Operations
-Cached GetHiveKey() calls to avoid repeated lookups
+   Cached GetHiveKey() calls to avoid repeated lookups
 
 Combined duplicate registry operations into helper methods
 
 Used pattern matching for switch expressions
 
 4. Process Management
-Added proper disposal of Process objects to prevent resource leaks
+   Added proper disposal of Process objects to prevent resource leaks
 
 Optimized process name extraction
 
 Added guard clauses for empty task collections
 
 5. String Operations
-Used StringComparison.OrdinalIgnoreCase instead of ToLower() comparisons
+   Used StringComparison.OrdinalIgnoreCase instead of ToLower() comparisons
 
 Leveraged ReadOnlySpan<char> for substring operations
 
 Used string interpolation where appropriate
 
 6. Code Structure
-Removed unused imports and classes
+   Removed unused imports and classes
 
 Simplified complex conditional logic
 
@@ -91,7 +92,7 @@ Used expression-bodied members where appropriate
 Eliminated redundant code paths
 
 7. Performance Gains
-GUID operations: 3-5x faster using Span operations
+   GUID operations: 3-5x faster using Span operations
 
 Registry enumeration: 2-3x faster with cached hive keys
 
