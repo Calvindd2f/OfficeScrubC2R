@@ -74,8 +74,39 @@ $script:Orchestrator = $null
 #region C# Type Loading
 
 function Initialize-NativeTypes {
+    # Check if types are already loaded
+    try {
+        $null = [OfficeScrubNative.OfficeScrubOrchestrator]
+        Write-Verbose "Native C# types already loaded"
+        return
+    }
+    catch {
+        # Types not loaded yet, proceed with loading
+    }
+    
+    # Get the module's base path (works for both standalone and nested modules)
+    $moduleBasePath = $PSScriptRoot
+    if ([string]::IsNullOrEmpty($moduleBasePath)) {
+        # Try to get path from the module info
+        $moduleInfo = Get-Module -Name OfficeScrubC2R-Utilities -ErrorAction SilentlyContinue
+        if ($moduleInfo) {
+            $moduleBasePath = Split-Path -Parent $moduleInfo.Path
+        }
+        # If still empty, try parent module
+        if ([string]::IsNullOrEmpty($moduleBasePath)) {
+            $parentModule = Get-Module -Name OfficeScrubC2R -ErrorAction SilentlyContinue
+            if ($parentModule) {
+                $moduleBasePath = Split-Path -Parent $parentModule.Path
+            }
+        }
+        # Last resort: use current location
+        if ([string]::IsNullOrEmpty($moduleBasePath)) {
+            $moduleBasePath = (Get-Location).Path
+        }
+    }
+    
     # Try to load the pre-compiled DLL first
-    $dllPath = Join-Path $PSScriptRoot "OfficeScrubNative.dll"
+    $dllPath = Join-Path $moduleBasePath "OfficeScrubNative.dll"
     
     if (Test-Path $dllPath) {
         try {
@@ -84,18 +115,22 @@ function Initialize-NativeTypes {
             return
         }
         catch {
-            if ($_.Exception.Message -notlike "*already exists*") {
-                Write-Warning "Failed to load DLL, falling back to source compilation: $_"
+            # Check for various "already loaded" error messages
+            $errorMessage = $_.Exception.Message
+            if ($errorMessage -like "*already exists*" -or 
+                $errorMessage -like "*already loaded*" -or
+                $errorMessage -like "*Assembly with same name*") {
+                Write-Verbose "Native C# types already loaded (detected via error message)"
+                return
             }
             else {
-                Write-Verbose "Native C# types already loaded"
-                return
+                Write-Warning "Failed to load DLL, falling back to source compilation: $_"
             }
         }
     }
     
     # Fallback: compile from source
-    $csharpPath = Join-Path $PSScriptRoot "OfficeScrubC2R-Native.cs"
+    $csharpPath = Join-Path $moduleBasePath "OfficeScrubC2R-Native.cs"
     if (-not (Test-Path $csharpPath)) {
         throw "Neither DLL nor C# source file found. Expected: $dllPath or $csharpPath"
     }
@@ -141,7 +176,14 @@ function Initialize-NativeTypes {
         Write-Verbose "Native C# types loaded from source successfully"
     }
     catch {
-        if ($_.Exception.Message -notlike "*already exists*") {
+        # Check for various "already loaded" error messages
+        $errorMessage = $_.Exception.Message
+        if ($errorMessage -like "*already exists*" -or 
+            $errorMessage -like "*already loaded*" -or
+            $errorMessage -like "*Assembly with same name*") {
+            Write-Verbose "Native C# types already loaded (detected via error message)"
+        }
+        else {
             throw "Failed to load C# types: $_"
         }
     }
@@ -482,6 +524,12 @@ function Remove-FolderRecursive {
         [switch]$Force
     )
 
+    # Validate Path parameter
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        Write-Warning "Remove-FolderRecursive: Path parameter is empty or null"
+        return $false
+    }
+
     if (-not (Test-Path $Path)) {
         return $true
     }
@@ -510,6 +558,12 @@ function Remove-FileForced {
         [string]$Path,
         [switch]$ScheduleOnFail
     )
+
+    # Validate Path parameter
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        Write-Warning "Remove-FileForced: Path parameter is empty or null"
+        return $false
+    }
 
     if (-not (Test-Path $Path)) {
         return $true
@@ -726,7 +780,19 @@ function Test-IsC2R {
         return $false
     }
 
-    return $script:Orchestrator.IsC2RPath($Path)
+    # Validate Path parameter
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        Write-Warning "Test-IsC2R: Path parameter is empty or null"
+        return $false
+    }
+
+    try {
+        return $script:Orchestrator.IsC2RPath($Path)
+    }
+    catch {
+        Write-Warning "Test-IsC2R failed for path '$Path': $_"
+        return $false
+    }
 }
 
 function Test-ProductInScope {

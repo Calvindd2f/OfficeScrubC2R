@@ -156,10 +156,21 @@ function Find-InstalledOfficeProducts {
         }
     }
     else {
-        Write-Log "No registered product(s) found"
+        Write-Log "No registered product(s) found in C2RSuite"
     }
 
-    return $script:InstalledSku.Count -gt 0
+    if ($script:InstalledSku.Count -gt 0) {
+        Write-Log "Installed Office products found:"
+        foreach ($key in $script:InstalledSku.Keys) {
+            Write-Log (" - {0} - {1}" -f $key, $script:InstalledSku[$key])
+        }
+    }
+    else {
+        Write-Log "No installed Office products found"
+    }
+
+    # Return true if we found any products (either in InstalledSku or C2RSuite)
+    return ($script:InstalledSku.Count -gt 0 -or $script:C2RSuite.Count -gt 0)
 }
 
 function Ensure-ValidWIMetadata {
@@ -227,8 +238,19 @@ function Uninstall-OfficeProducts {
         }
     }
 
+    if ($script:C2RSuite.Count -eq 0 -and $script:InstalledSku.Count -gt 0) {
+        Write-Log ("Warning: Found {0} Office product(s) but no C2R items registered in ARP. Attempting uninstall anyway." -f $script:InstalledSku.Count)
+        # Try to build C2RSuite from InstalledSku for ODT removal
+        foreach ($key in $script:InstalledSku.Keys) {
+            if (-not $script:C2RSuite.ContainsKey($key)) {
+                $script:C2RSuite[$key] = $script:InstalledSku[$key]
+            }
+        }
+    }
+
     if ($script:C2RSuite.Count -eq 0) {
         Write-Log ("No uninstallable C2R items registered in Uninstall: {0}" -f $script:C2RSuite.Count)
+        return
     }
 
     # Call ODT-based uninstall
@@ -991,6 +1013,11 @@ function Main {
         Write-Log ("Fatal error: {0}" -f $_.Exception.Message)
         if ($_.ScriptStackTrace) {
             Write-LogOnly "Stack trace: $($_.ScriptStackTrace)"
+        }
+        if ($_.Exception.Message -like "*Path*") {
+            Write-LogOnly "Error location: $($_.InvocationInfo.ScriptName):$($_.InvocationInfo.ScriptLineNumber)"
+            Write-LogOnly "Function: $($_.InvocationInfo.FunctionName)"
+            Write-LogOnly "Line: $($_.InvocationInfo.Line)"
         }
         Set-ErrorCode $script:ERROR_UNKNOWN
         if ($null -ne $script:LogInitialized -and $script:LogInitialized) {

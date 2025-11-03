@@ -82,22 +82,22 @@ else {
 
 .EXAMPLE
     Invoke-OfficeScrubC2R
-    
+
     Interactive mode - will prompt for confirmation before removal.
 
 .EXAMPLE
     Invoke-OfficeScrubC2R -Quiet -Force
-    
+
     Silent removal without prompts or confirmation.
 
 .EXAMPLE
     Invoke-OfficeScrubC2R -DetectOnly
-    
+
     Detect installed Office C2R products without removing them.
 
 .EXAMPLE
     Invoke-OfficeScrubC2R -KeepLicense -LogPath "C:\Logs"
-    
+
     Remove Office but keep licenses, saving logs to custom location.
 
 .NOTES
@@ -105,7 +105,7 @@ else {
     Original: Microsoft Corporation (OffScrubC2R.vbs)
     Version: 2.19.0
     Requires: PowerShell 5.1+, .NET Framework 4.5+, Administrator privileges
-    
+
 .LINK
     https://github.com/Calvindd2f/OfficeScrubC2R
 
@@ -161,7 +161,7 @@ function Invoke-OfficeScrubC2R {
         if (-not $NoElevate) {
             $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
             $isAdmin = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-            
+
             if (-not $isAdmin) {
                 throw "This command requires Administrator privileges. Please run PowerShell as Administrator."
             }
@@ -184,7 +184,7 @@ function Invoke-OfficeScrubC2R {
                 $shouldProceed = $true
             }
         }
-        
+
         if ($shouldProceed) {
             try {
                 # Set script-level variables for the main script functions
@@ -203,7 +203,7 @@ function Invoke-OfficeScrubC2R {
 
                 # Call Main function directly (script already dot-sourced)
                 $exitCode = Main
-                
+
                 # Return exit code
                 return $exitCode
             }
