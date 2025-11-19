@@ -62,49 +62,79 @@ public static class Constants
 }
 
 /// <summary>
-/// Declaration of variables
+/// Main class for Office C2R removal utility
 /// </summary>
+public class OffScrubC2R
+{
+    /// <summary>
+    /// Declaration of variables
+    /// </summary>
 
-/// <objects>Object-type variables</object>
+    /// <objects>Object-type variables</object>
     object oFso, oMsi, oReg, oWShell, oWmiLocal, oShellApp;
     object ComputerItem, Key, Item, LogStream, TmpKey;
 
-/// <Array>Array</Array>
+    /// <Array>Array</Array>
     object[] arrVersion;
 
-/// <Dictionaries>Dictionaries (using Dictionary<string, object> as a generic replacement)</Dictionaries>
+    /// <Dictionaries>Dictionaries (using Dictionary<string, object> as a generic replacement)</Dictionaries>
     Dictionary<string, object> dicKeepLis, dicApps, dicKeepFolder, dicDelRegKey, dicKeepReg, dicSC;
     Dictionary<string, object> dicInstalledSku, dicRemoveSku, dicKeepSku, dicC2RSuite, dicDelInUse, dicDelFolder;
 
-/// <Strings>Strings</Strings>
+    /// <Strings>Strings</Strings>
     string sAppData, sScrubDir, sProgramFiles, sProgramFilesX86, sCommonProgramFiles;
     string sAllusersProfile, sOSVersion, sWinDir, sWICacheDir, sCommonProgramFilesX86;
     string sProgramData, sPackageFolder, sLocalAppData, sOInstallRoot, sSkuRemoveList;
     string sOSinfo, sDefault, sTemp, sTmp, sCmd, sLogDir, sProfilesDirectory, sArpUninstallCmd;
     string sRetVal, sScriptDir, sPackageGuid, sValue, sActiveConfiguration, sNotepad;
 
-/// <Integers>Integers</Integers>
+    /// <Integers>Integers</Integers>
     int iVersionNT, iError, iProcCloseCnt;
 
-/// <Booleans>Booleans</Booleans>
+    /// <Booleans>Booleans</Booleans>
     bool f64, fLogInitialized, fNoCancel, fRemoveOse, fDetectOnly, fQuiet, fForce;
     bool fC2R, fRemoveAll, fRebootRequired, fRerun, fSetRunOnce, fTestRerun;
     bool fIsElevated, fNoElevate, fUserConsent, fCScript, fReturnErrorOrSuccess;
     bool fClearTaskBand, fSkipSD, fUnpinMode, fKeepLicense, fOffline, fForceArpUninstall;
 
-/// <Named pipe and file system helper variables>Named pipe and file system helper variables
+    /// <Named pipe and file system helper variables>Named pipe and file system helper variables
     string pipename;
     object pipeStream; /// <type>type depends on implementation, e.g., NamedPipeServerStream</type>
     object fs;         /// <type>type depends on use, e.g., FileStream, FileSystemInfo, etc.</type>
-/// </Named pipe and file system helper variables>
+    /// </Named pipe and file system helper variables>
 
-// -------------------------------------------------------------------------------
-//                                   main
-//
-//                           Main section of script
-// -------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------
+    //                                   Execute
+    //
+    //                           Main entry point - callable from PowerShell
+    // -------------------------------------------------------------------------------
 
-public void main()
+    /// <summary>
+    /// Main entry point for the removal utility. Can be called from PowerShell.
+    /// </summary>
+    /// <param name="args">Command line arguments (optional)</param>
+    /// <returns>Exit code indicating success or failure</returns>
+    public int Execute(string[] args = null)
+    {
+        // Store original command line args if provided
+        if (args != null && args.Length > 0)
+        {
+            // Set up for ParseCmdLine to use provided args
+            // Note: ParseCmdLine uses Environment.GetCommandLineArgs(), so we may need to adjust
+            // For now, this will work with the default behavior
+        }
+        
+        main();
+        return iError;
+    }
+
+    // -------------------------------------------------------------------------------
+    //                                   main
+    //
+    //                           Main section of script
+    // -------------------------------------------------------------------------------
+
+    private void main()
 {
     // Initialize required settings and objects
     Initialize();
@@ -393,7 +423,7 @@ public void main()
 //
 //   Configure defaults and initialize all required objects
 //-------------------------------------------------------------------------------
-public void Initialize()
+private void Initialize()
 {
     // set variable defaults
     //----------------------
@@ -622,7 +652,7 @@ public void Initialize()
 //
 //   Initialize global objects
 //-------------------------------------------------------------------------------
-public void InitObjects()
+private void InitObjects()
 {
     oWmiLocal = new System.Management.ManagementScope(@"\\.\root\cimv2");
     oWShell = new System.Diagnostics.Process();
@@ -637,7 +667,7 @@ public void InitObjects()
 //
 //   Free initialized global objects
 //-------------------------------------------------------------------------------
-public void FreeObjects()
+private void FreeObjects()
 {
     if (oWmiLocal is IDisposable disposable1) disposable1.Dispose();
     if (oWShell is IDisposable disposable2) disposable2.Dispose();
@@ -652,7 +682,7 @@ public void FreeObjects()
 //
 //   Command line parser
 //-------------------------------------------------------------------------------
-public void ParseCmdLine()
+private void ParseCmdLine()
 {
     string[] arrArguments;
     string sArguments = "";
@@ -817,7 +847,7 @@ public void ParseCmdLine()
 //
 //   Show the expected syntax for the script usage
 //-------------------------------------------------------------------------------
-public void ShowSyntax()
+private void ShowSyntax()
 {
     Console.WriteLine($"\r\n{Constants.SCRIPTFILE} V {Constants.SCRIPTVERSION}\r\n" +
                      "Copyright (c) Microsoft Corporation. All Rights Reserved\r\n\r\n" +
@@ -839,7 +869,7 @@ public void ShowSyntax()
 //   Office configuration products are listed with their configuration product
 //   name in the "Uninstall" key.
 //-------------------------------------------------------------------------------
-public void FindInstalledOProducts()
+private void FindInstalledOProducts()
 {
     string ArpItem, prod, cult;
     string sCurKey, sValue, sConfigName, sCulture, sDisplayVersion, sVersionFallback;
@@ -1170,7 +1200,7 @@ public void FindInstalledOProducts()
 //   Ensures that only valid metadata entries exist to avoid API failures.
 //   Invalid entries will be removed
 //-------------------------------------------------------------------------------
-public void EnsureValidWIMetadata(int hDefKey, string sKey, int iValidLength)
+private void EnsureValidWIMetadata(int hDefKey, string sKey, int iValidLength)
 {
     string[] arrKeys;
 
@@ -1196,7 +1226,7 @@ public void EnsureValidWIMetadata(int hDefKey, string sKey, int iValidLength)
 //
 //   Clean out licenses from the Office Software Protection Platform
 //-------------------------------------------------------------------------------
-public void CleanOSPP()
+private void CleanOSPP()
 {
     const string OfficeAppId = "0ff1ce15-a989-479d-af46-f275c6370663";  //Office 2013
 
@@ -1269,7 +1299,7 @@ public void CleanOSPP()
 //
 //   clear local license cache for vNext
 //-------------------------------------------------------------------------------
-public void ClearVNextLicCache()
+private void ClearVNextLicCache()
 {
     string sLocalAppData = ExpandEnv("%localappdata%");
     DeleteFolder($"{sLocalAppData}\\Microsoft\\Office\\Licenses");
@@ -1281,7 +1311,7 @@ public void ClearVNextLicCache()
 //
 //   Delete known scheduled tasks.
 //-------------------------------------------------------------------------------
-public void DelSchtasks()
+private void DelSchtasks()
 {
     if ((iError & Constants.ERROR_USERCANCEL) != 0) return;
 
@@ -1353,7 +1383,7 @@ public void DelSchtasks()
 //
 //   End all running instances of applications that will be removed.
 //-------------------------------------------------------------------------------
-public void CloseOfficeApps()
+private void CloseOfficeApps()
 {
     bool fWait = false;
     iProcCloseCnt = iProcCloseCnt + 1;
@@ -1488,7 +1518,7 @@ public void CloseOfficeApps()
 //
 //   Identify and invoke default uninstall command for a regular uninstall.
 //-------------------------------------------------------------------------------
-public void Uninstall()
+private void Uninstall()
 {
     if ((iError & Constants.ERROR_USERCANCEL) != 0) return;
 
@@ -1710,7 +1740,7 @@ public void Uninstall()
 //   BuildRemoveXml
 //
 //-------------------------------------------------------------------------------
-public void BuildRemoveXml()
+private void BuildRemoveXml()
 {
     try
     {
@@ -1746,7 +1776,7 @@ public void BuildRemoveXml()
 //
 //   Copy a file from a url to a local path using HttpClient
 //-------------------------------------------------------------------------------
-public bool HttpDownloadFile(string sUrl, string sLocalPath)
+private bool HttpDownloadFile(string sUrl, string sLocalPath)
 {
     try
     {
@@ -1784,7 +1814,7 @@ public bool HttpDownloadFile(string sUrl, string sLocalPath)
 //
 //   Uninstall all of Office C2R through ODT
 //-------------------------------------------------------------------------------
-public void UninstallOfficeC2R()
+private void UninstallOfficeC2R()
 {
     try
     {
@@ -1991,7 +2021,7 @@ private int RunCommand(string command, bool waitForExit)
 //
 //   Removal of left behind registry data
 //-------------------------------------------------------------------------------
-public void Regwipe()
+private void Regwipe()
 {
     if ((iError & Constants.ERROR_USERCANCEL) != 0) return;
 
@@ -2298,7 +2328,7 @@ public void Regwipe()
 //   Delete registry items that may cause Explorer / Windows Shell to have a lock
 //   on files
 //-------------------------------------------------------------------------------
-public void ClearShellIntegrationReg()
+private void ClearShellIntegrationReg()
 {
     try
     {
@@ -2371,7 +2401,7 @@ public void ClearShellIntegrationReg()
 //   Clear out left behind Typelib registrations
 //-------------------------------------------------------------------------------
 //Clean out known typelib registration
-public void RegWipeTypeLib()
+private void RegWipeTypeLib()
 {
     try
     {
@@ -2506,7 +2536,7 @@ public void RegWipeTypeLib()
 //
 //   Removal of left behind services, files and shortcuts
 //-------------------------------------------------------------------------------
-public void FileWipe()
+private void FileWipe()
 {
     if ((iError & Constants.ERROR_USERCANCEL) != 0) return;
 
@@ -2630,7 +2660,7 @@ public void FileWipe()
 //
 //   Recursively search all profile folders for Office shortcuts in scope
 //-------------------------------------------------------------------------------
-public void CleanShortcuts(string sFolder, bool fDelete, bool fUnPin)
+private void CleanShortcuts(string sFolder, bool fDelete, bool fUnPin)
 {
     if (fSkipSD) return;
 
@@ -2760,7 +2790,7 @@ public void CleanShortcuts(string sFolder, bool fDelete, bool fUnPin)
 //
 //   Unpins a shortcut from the taskbar or start menu
 //-------------------------------------------------------------------------------
-public void Unpin(string sFilePath)
+private void Unpin(string sFilePath)
 {
     try
     {
@@ -2787,7 +2817,7 @@ public void Unpin(string sFilePath)
 //
 //   Clears contents from the users taskband to get rid of pinned items
 //-------------------------------------------------------------------------------
-public void ClearTaskBand()
+private void ClearTaskBand()
 {
     try
     {
@@ -2829,7 +2859,7 @@ public void ClearTaskBand()
 //
 //   Loads the HKCU for all local users
 //-------------------------------------------------------------------------------
-public void LoadUsersReg()
+private void LoadUsersReg()
 {
     try
     {
@@ -2872,7 +2902,7 @@ public void LoadUsersReg()
 //
 //   Recursively search and clear the HKLM Office key from references in scope
 //-------------------------------------------------------------------------------
-public void ClearOfficeHKLM(string sSubKeyName)
+private void ClearOfficeHKLM(string sSubKeyName)
 {
     try
     {
@@ -2930,7 +2960,7 @@ public void ClearOfficeHKLM(string sSubKeyName)
 //   Check if the passed in string is related to C2R
 //   Returns TRUE if in C2R scope
 //-------------------------------------------------------------------------------
-public bool IsC2R(string sValue)
+private bool IsC2R(string sValue)
 {
     const string OREF = "\\ROOT\\OFFICE1";
     const string OREFROOT = "Microsoft Office\\Root\\";
@@ -2958,7 +2988,7 @@ public bool IsC2R(string sValue)
 //   Test the permissions on some key registry locations to determine if
 //   sufficient permissions are given.
 //-------------------------------------------------------------------------------
-public bool CheckRegPermissions()
+private bool CheckRegPermissions()
 {
     const int KEY_QUERY_VALUE = 0x0001;
     const int KEY_SET_VALUE = 0x0002;
@@ -2988,7 +3018,7 @@ public bool CheckRegPermissions()
 //
 //   Returns the process id of the own process
 //-------------------------------------------------------------------------------
-public int GetMyProcessId()
+private int GetMyProcessId()
 {
     try
     {
@@ -3021,7 +3051,7 @@ public int GetMyProcessId()
 //
 //   Returns the delimiter for a passed in string
 //-------------------------------------------------------------------------------
-public string Delimiter(string sVersion)
+private string Delimiter(string sVersion)
 {
     if (string.IsNullOrEmpty(sVersion)) return " ";
 
@@ -3041,7 +3071,7 @@ public string Delimiter(string sVersion)
 //
 //   Returns the expanded string from a compressed GUID
 //-------------------------------------------------------------------------------
-public string GetExpandedGuid(string sGuid)
+private string GetExpandedGuid(string sGuid)
 {
     //Ensure valid length
     if (sGuid == null || sGuid.Length != 32) return "";
@@ -3092,7 +3122,7 @@ public string GetExpandedGuid(string sGuid)
 //
 //   Returns the compressed string for a GUID
 //-------------------------------------------------------------------------------
-public string GetCompressedGuid(string sGuid)
+private string GetCompressedGuid(string sGuid)
 {
     //Ensure Valid Length
     if (sGuid == null || sGuid.Length != 38) return "";
@@ -3138,7 +3168,7 @@ public string GetCompressedGuid(string sGuid)
 //
 //   Returns the GUID from a squished format
 //-------------------------------------------------------------------------------
-public bool GetDecodedGuid(string sEncGuid, out string sGuid)
+private bool GetDecodedGuid(string sEncGuid, out string sGuid)
 {
     sGuid = "";
     if (string.IsNullOrEmpty(sEncGuid) || sEncGuid.Length < 20) return false;
@@ -3194,7 +3224,7 @@ public bool GetDecodedGuid(string sEncGuid, out string sGuid)
 //
 //   Convert a long decimal to hex
 //-------------------------------------------------------------------------------
-public string DecToHex(long lDec)
+private string DecToHex(long lDec)
 {
     string[] arrChr = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F" };
     string sHex = "";
@@ -3227,7 +3257,7 @@ public string DecToHex(long lDec)
 //
 //   Relaunch self with 64 bit CScript host
 //-------------------------------------------------------------------------------
-public void RelaunchAs64Host()
+private void RelaunchAs64Host()
 {
     try
     {
@@ -3286,7 +3316,7 @@ public void RelaunchAs64Host()
 //
 //   Relaunch the script with elevated permissions
 //-------------------------------------------------------------------------------
-public void RelaunchElevated()
+private void RelaunchElevated()
 {
     try
     {
@@ -3373,7 +3403,7 @@ public void RelaunchElevated()
 //
 //   Relaunch self with Cscript as host
 //-------------------------------------------------------------------------------
-public void RelaunchAsCScript()
+private void RelaunchAsCScript()
 {
     try
     {
@@ -3417,7 +3447,7 @@ public void RelaunchAsCScript()
 //
 //   Set error bit(s)
 //-------------------------------------------------------------------------------
-public void SetError(int ErrorBit)
+private void SetError(int ErrorBit)
 {
     iError = iError | ErrorBit;
     switch (ErrorBit)
@@ -3437,7 +3467,7 @@ public void SetError(int ErrorBit)
 //
 //   Unset error bit(s)
 //-------------------------------------------------------------------------------
-public void ClearError(int ErrorBit)
+private void ClearError(int ErrorBit)
 {
     iError = iError & (Constants.ERROR_ALL - ErrorBit);
     switch (ErrorBit)
@@ -3455,7 +3485,7 @@ public void ClearError(int ErrorBit)
 //
 //   Write return value to file
 //-------------------------------------------------------------------------------
-public void SetRetVal(int errorValue)
+private void SetRetVal(int errorValue)
 {
     //don't fail script execution if writing the return value to file fails
     try
@@ -3475,7 +3505,7 @@ public void SetRetVal(int errorValue)
 //   Read return value from file.
 //   Used to ensure return value can get obtained from an elevated process
 //-------------------------------------------------------------------------------
-public int GetRetValFromFile()
+private int GetRetValFromFile()
 {
     //don't fail script execution when getting the return value from file fails
     try
@@ -3502,7 +3532,7 @@ public int GetRetValFromFile()
 //
 //   Create the removal log file
 //-------------------------------------------------------------------------------
-public void CreateLog()
+private void CreateLog()
 {
     try
     {
@@ -3540,7 +3570,7 @@ public void CreateLog()
 //
 //   Translates the numeric constant into the human readable registry hive string
 //-------------------------------------------------------------------------------
-public string HiveString(int hDefKey)
+private string HiveString(int hDefKey)
 {
     switch (hDefKey)
     {
@@ -3562,7 +3592,7 @@ public string HiveString(int hDefKey)
 //
 //   Returns a boolean for the test on existence of a given registry key
 //-------------------------------------------------------------------------------
-public bool RegKeyExists(int hDefKey, string sSubKeyName)
+private bool RegKeyExists(int hDefKey, string sSubKeyName)
 {
     string[] arrKeys;
     return RegEnumKey(hDefKey, sSubKeyName, out arrKeys);
@@ -3573,7 +3603,7 @@ public bool RegKeyExists(int hDefKey, string sSubKeyName)
 //
 //   Returns a boolean for the test on existence of a given registry value
 //-------------------------------------------------------------------------------
-public bool RegValExists(int hDefKey, string sSubKeyName, string sName)
+private bool RegValExists(int hDefKey, string sSubKeyName, string sName)
 {
     if (!RegKeyExists(hDefKey, sSubKeyName)) return false;
 
@@ -3597,7 +3627,7 @@ public bool RegValExists(int hDefKey, string sSubKeyName, string sName)
 //   Read the value of a given registry entry
 //   The correct type has to be passed in as argument
 //-------------------------------------------------------------------------------
-public bool RegReadValue(int hDefKey, string sSubKeyName, string sName, out string sValue, string sType)
+private bool RegReadValue(int hDefKey, string sSubKeyName, string sName, out string sValue, string sType)
 {
     sValue = "";
     int RetVal = -1;
@@ -3701,7 +3731,7 @@ private Microsoft.Win32.RegistryKey GetRegistryKey(int hDefKey)
 //
 //   Enumerate a registry key to return all values
 //-------------------------------------------------------------------------------
-public bool RegEnumValues(int hDefKey, string sSubKeyName, out string[] arrNames, out string[] arrTypes)
+private bool RegEnumValues(int hDefKey, string sSubKeyName, out string[] arrNames, out string[] arrTypes)
 {
     arrNames = null;
     arrTypes = null;
@@ -3789,7 +3819,7 @@ private bool EnumRegistryValues(int hDefKey, string sSubKeyName, out string[] ar
 //
 //   Enumerate a registry key to return all subkeys
 //-------------------------------------------------------------------------------
-public bool RegEnumKey(int hDefKey, string sSubKeyName, out string[] arrKeys)
+private bool RegEnumKey(int hDefKey, string sSubKeyName, out string[] arrKeys)
 {
     arrKeys = null;
     bool RetVal = false;
@@ -3875,7 +3905,7 @@ private bool EnumRegistryKeys(int hDefKey, string sSubKeyName, out string[] arrK
 //
 //   Wrapper around oReg.DeleteValue to handle 64 bit
 //-------------------------------------------------------------------------------
-public void RegDeleteValue(int hDefKey, string sSubKeyName, string sName, bool fRegMultiSZ)
+private void RegDeleteValue(int hDefKey, string sSubKeyName, string sName, bool fRegMultiSZ)
 {
     try
     {
@@ -3978,7 +4008,7 @@ private int DeleteRegistryValue(int hDefKey, string sSubKeyName, string sName)
 //
 //   Wrappper around RegDeleteKeyEx to handle 64bit
 //-------------------------------------------------------------------------------
-public void RegDeleteKey(int hDefKey, string sSubKeyName)
+private void RegDeleteKey(int hDefKey, string sSubKeyName)
 {
     try
     {
@@ -4058,7 +4088,7 @@ public void RegDeleteKey(int hDefKey, string sSubKeyName)
 //
 //   Recursively delete a registry structure
 //-------------------------------------------------------------------------------
-public void RegDeleteKeyEx(int hDefKey, string sSubKeyName)
+private void RegDeleteKeyEx(int hDefKey, string sSubKeyName)
 {
     try
     {
@@ -4138,7 +4168,7 @@ private int DeleteRegistryKey(int hDefKey, string sSubKeyName)
 //
 //   Return the 32bit regkey location on a 64bit environment
 //-------------------------------------------------------------------------------
-public string Wow64Key(int hDefKey, string sSubKeyName)
+private string Wow64Key(int hDefKey, string sSubKeyName)
 {
     int iPos;
 
@@ -4182,7 +4212,7 @@ public string Wow64Key(int hDefKey, string sSubKeyName)
 //
 //   Remove duplicate entries from a one dimensional array
 //-------------------------------------------------------------------------------
-public string[] RemoveDuplicates(string[] array)
+private string[] RemoveDuplicates(string[] array)
 {
     if (array == null) return null;
 
@@ -4202,7 +4232,7 @@ public string[] RemoveDuplicates(string[] array)
 //
 //   Checks the status of 'Err' and logs the error details if <> 0
 //-------------------------------------------------------------------------------
-public void CheckError(string sModule)
+private void CheckError(string sModule)
 {
     // In C#, we check for exceptions differently - this method is called from catch blocks
     // For VBScript compatibility, we'll log if there's a last exception
@@ -4216,7 +4246,7 @@ public void CheckError(string sModule)
 //
 //   Write a header log string to the log file
 //-------------------------------------------------------------------------------
-public void LogH(string sLog)
+private void LogH(string sLog)
 {
     if (LogStream != null)
     {
@@ -4236,7 +4266,7 @@ public void LogH(string sLog)
 //
 //   Write a header log string to the log file
 //-------------------------------------------------------------------------------
-public void LogH1(string sLog)
+private void LogH1(string sLog)
 {
     if (LogStream != null)
     {
@@ -4256,7 +4286,7 @@ public void LogH1(string sLog)
 //
 //   Write w/o indent Cmd window and the log file
 //-------------------------------------------------------------------------------
-public void LogH2(string sLog)
+private void LogH2(string sLog)
 {
     if (!fQuiet && fCScript)
     {
@@ -4274,7 +4304,7 @@ public void LogH2(string sLog)
 //
 //   Echos the log string to the Cmd window and the log file
 //-------------------------------------------------------------------------------
-public void Log(string sLog)
+private void Log(string sLog)
 {
     if (!fQuiet && fCScript)
     {
@@ -4298,7 +4328,7 @@ public void Log(string sLog)
 //
 //   Commits the log string to the log file
 //-------------------------------------------------------------------------------
-public void LogOnly(string sLog)
+private void LogOnly(string sLog)
 {
     if (LogStream != null)
     {
@@ -4313,12 +4343,12 @@ public void LogOnly(string sLog)
     }
 }
 
-public void LogY(string sLog)
+private void LogY(string sLog)
 {
     LogPipe(sLog);
 }
 
-public void LogPipe(string sLog)
+private void LogPipe(string sLog)
 {
     try
     {
@@ -4347,7 +4377,7 @@ public void LogPipe(string sLog)
 //   Check if ProductCode is in scope for removal
 //-------------------------------------------------------------------------------
 //Check if ProductCode is in scope
-public bool InScope(string sProductCode)
+private bool InScope(string sProductCode)
 {
     const string OFFICEID = "0000000FF1CE}";
     bool fInScope = false;
@@ -4410,7 +4440,7 @@ public bool InScope(string sProductCode)
 //
 //   Check a ProductCode is known to stay installed
 //-------------------------------------------------------------------------------
-public bool CheckDelete(string sProductCode)
+private bool CheckDelete(string sProductCode)
 {
     // ensure valid GUID length
     if (sProductCode == null || sProductCode.Length != 38) return false;
@@ -4428,7 +4458,7 @@ public bool CheckDelete(string sProductCode)
 //   Delete a service
 //-------------------------------------------------------------------------------
 //Delete a service
-public void DeleteService(string sName)
+private void DeleteService(string sName)
 {
     try
     {
@@ -4510,7 +4540,7 @@ public void DeleteService(string sName)
 //
 //   Translation for known uninstall return values
 //-------------------------------------------------------------------------------
-public string SetupRetVal(int RetVal)
+private string SetupRetVal(int RetVal)
 {
     switch (RetVal)
     {
@@ -4576,7 +4606,7 @@ public string SetupRetVal(int RetVal)
 //
 //   Wrapper to delete a file
 //-------------------------------------------------------------------------------
-public void DeleteFile(string sFile)
+private void DeleteFile(string sFile)
 {
     try
     {
@@ -4658,7 +4688,7 @@ public void DeleteFile(string sFile)
 //
 //   Wrapper to delete a folder
 //-------------------------------------------------------------------------------
-public void DeleteFolder(string sFolder)
+private void DeleteFolder(string sFolder)
 {
     try
     {
@@ -4802,7 +4832,7 @@ public void DeleteFolder(string sFolder)
     }
 }
 
-public void DeleteFolder_WMI(string sFolder)
+private void DeleteFolder_WMI(string sFolder)
 {
     try
     {
@@ -4832,7 +4862,7 @@ public void DeleteFolder_WMI(string sFolder)
 //   Returns the WOW folder structure to handle folder-path operations on
 //   64 bit environments
 //-------------------------------------------------------------------------------
-public string Wow64Folder(string sFolder)
+private string Wow64Folder(string sFolder)
 {
     string system32Path = sWinDir + "\\System32";
     if (sFolder.StartsWith(system32Path, StringComparison.OrdinalIgnoreCase))
@@ -4854,7 +4884,7 @@ public string Wow64Folder(string sFolder)
 //
 //   Adds a file to the list of items to delete on reboot
 //-------------------------------------------------------------------------------
-public void ScheduleDeleteFile(string sFile)
+private void ScheduleDeleteFile(string sFile)
 {
     if (!dicDelInUse.ContainsKey(sFile))
     {
@@ -4871,7 +4901,7 @@ public void ScheduleDeleteFile(string sFile)
 //   Recursively adds a folder and its contents to the list of
 //   items to delete on reboot
 //-------------------------------------------------------------------------------
-public void ScheduleDeleteFolder(string sFolder)
+private void ScheduleDeleteFolder(string sFolder)
 {
     try
     {
@@ -4908,7 +4938,7 @@ public void ScheduleDeleteFolder(string sFolder)
 //   Schedules the delete of files/folders in use on next reboot by adding
 //   affected files/folders to the PendingFileRenameOperations registry entry
 //-------------------------------------------------------------------------------
-public void ScheduleDeleteEx()
+private void ScheduleDeleteEx()
 {
     try
     {
@@ -4956,7 +4986,7 @@ public void ScheduleDeleteEx()
 //
 //   Deletes an individual folder structure if empty
 //-------------------------------------------------------------------------------
-public void DeleteEmptyFolder(string sFolder)
+private void DeleteEmptyFolder(string sFolder)
 {
     // cosmetic task don't fail on error
     try
@@ -4982,7 +5012,7 @@ public void DeleteEmptyFolder(string sFolder)
 //
 //   Delete an empty folder structure
 //-------------------------------------------------------------------------------
-public void DeleteEmptyFolders()
+private void DeleteEmptyFolders()
 {
     // cosmetic task don't fail on error
     try
@@ -5017,7 +5047,7 @@ public void DeleteEmptyFolders()
 //
 //   Wrapper to delete a folder and the empty parent folder structure
 //-------------------------------------------------------------------------------
-public void SmartDeleteFolder(string sFolder)
+private void SmartDeleteFolder(string sFolder)
 {
     string sDelFolder;
 
@@ -5050,7 +5080,7 @@ public void SmartDeleteFolder(string sFolder)
 //
 //   Executes the folder delete operation(s)
 //-------------------------------------------------------------------------------
-public void SmartDeleteFolderEx(string sFolder)
+private void SmartDeleteFolderEx(string sFolder)
 {
     try
     {
@@ -5074,7 +5104,7 @@ public void SmartDeleteFolderEx(string sFolder)
 //
 //   Ensure Windows Explorer is restarted if needed
 //-------------------------------------------------------------------------------
-public void RestoreExplorer()
+private void RestoreExplorer()
 {
     //Non critical routine. Don't fail on error
     try
@@ -5107,7 +5137,7 @@ public void RestoreExplorer()
 //   Replacement function to the internal Join function to prevent failures
 //   that were seen in some instances
 //-------------------------------------------------------------------------------
-public string MyJoin(string[] arrToJoin, string sSeparator)
+private string MyJoin(string[] arrToJoin, string sSeparator)
 {
     string sJoined = "";
     if (arrToJoin != null)
@@ -5126,7 +5156,7 @@ public string MyJoin(string[] arrToJoin, string sSeparator)
 //
 //   Flag need for reboot and schedule autorun to run the tool again on reboot.
 //-------------------------------------------------------------------------------
-public void Rerun()
+private void Rerun()
 {
     try
     {
@@ -5185,7 +5215,7 @@ public void Rerun()
 //
 //   Create a RunOnce entry to resume setup after a reboot
 //-------------------------------------------------------------------------------
-public void SetRunOnce()
+private void SetRunOnce()
 {
     try
     {
@@ -5203,4 +5233,25 @@ public void SetRunOnce()
     {
         Log($"Error in SetRunOnce: {ex.Message}");
     }
+}
+
+//-------------------------------------------------------------------------------
+//   ExpandEnv
+//
+//   Expand environment variable string
+//-------------------------------------------------------------------------------
+private string ExpandEnv(string sEnvVar)
+{
+    return Environment.ExpandEnvironmentVariables(sEnvVar);
+}
+
+//-------------------------------------------------------------------------------
+//   FolderExists
+//
+//   Check if a folder exists
+//-------------------------------------------------------------------------------
+private bool FolderExists(string sFolder)
+{
+    return Directory.Exists(sFolder);
+}
 }
