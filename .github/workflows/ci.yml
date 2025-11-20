@@ -97,7 +97,6 @@ jobs:
           $requiredFiles = @(
             'OfficeScrubC2R.psd1',
             'OfficeScrubC2R.psm1',
-            'OfficeScrubC2R-Utilities.psm1',
             'OfficeScrubNative.dll',
             'LICENSE',
             'README.md'
