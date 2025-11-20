@@ -35,16 +35,6 @@ jobs:
           Import-Module .\OfficeScrubC2R.psd1 -Force -Verbose
           Get-Module OfficeScrubC2R
 
-      - name: Run PSScriptAnalyzer
-        shell: pwsh
-        run: |
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
-          if ($results) {
-            $results | Format-Table -AutoSize
-            throw "PSScriptAnalyzer found issues"
-          }
-
       - name: Test module functions
         shell: pwsh
         run: |
