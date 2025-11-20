@@ -53,3 +53,6 @@ scratch/
 # Keep these artifacts (exceptions to above rules)
 !OfficeScrubNative.dll
 
+
+# Verification artifacts
+artifacts/

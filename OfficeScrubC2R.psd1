@@ -3,7 +3,7 @@
     RootModule             = 'OfficeScrubC2R.psm1'
 
     # Version number of this module.
-    ModuleVersion          = '2.19.2'
+    ModuleVersion          = '3.0.0'
 
     # Supported PSEditions
     CompatiblePSEditions   = @('Desktop', 'Core')
@@ -22,16 +22,7 @@
 
     # Description of the functionality provided by this module
     Description            = @'
-Complete PowerShell/C# implementation of Microsoft Office Scrub C2R tool. Provides comprehensive removal of Office 2013, 2016, 2019, and Office 365 Click-to-Run installations with 10-50x performance improvements over the original VBScript version.
-
-Features:
-- Native C# library for high-performance registry and file operations
-- Parallel processing for faster execution
-- Comprehensive logging and error handling
-- Support for Windows 7 SP1 through Windows 11
-- Compatible with PowerShell 5.1 and PowerShell 7+
-
-Requires Administrator privileges.
+Lightweight PowerShell wrapper for the converted OfficeScrub native DLL. The module focuses on surfacing the native methods/Windows API code through a small set of helper functions while keeping the original VBScript and C# reference sources in the repository for contrast.
 '@
 
     # Minimum version of the PowerShell engine required by this module
@@ -61,15 +52,15 @@ Requires Administrator privileges.
     FormatsToProcess       = @()
 
     # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
-    NestedModules          = @('OfficeScrubC2R-Utilities.psm1')
+    NestedModules          = @()
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport      = @(
-        'Invoke-OfficeScrubC2R',
-        'Get-InstalledOfficeProducts',
-        'Test-IsC2R',
-        'Initialize-Environment',
-        'Stop-OfficeProcesses'
+        'Import-OfficeScrubNative',
+        'New-OfficeScrubOrchestrator',
+        'Test-OfficeC2RPath',
+        'Test-OfficeProductScope',
+        'Get-OfficeScrubHelpers'
     )
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -79,7 +70,7 @@ Requires Administrator privileges.
     VariablesToExport      = @()
 
     # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
-    AliasesToExport        = @('Remove-OfficeC2R', 'Uninstall-OfficeC2R')
+    AliasesToExport        = @()
 
     # DSC resources to export from this module
     DscResourcesToExport   = @()
@@ -91,14 +82,12 @@ Requires Administrator privileges.
     FileList               = @(
         'OfficeScrubC2R.psd1',
         'OfficeScrubC2R.psm1',
-        'OfficeScrubC2R.ps1',
-        'OfficeScrubC2R-Utilities.psm1',
-        'OfficeScrubC2R-Native.cs',
         'OfficeScrubNative.dll',
-        'build.ps1',
+        'OfficeScrubC2R-Native.cs',
+        'direct_conversion.cs',
+        'docs\source\OfficeScrubC2R.vbs',
         'LICENSE',
-        'README.md',
-        'docs\CHANGELOG.md'
+        'README.md'
     )
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
@@ -133,27 +122,18 @@ Requires Administrator privileges.
 
             # ReleaseNotes of this module
             ReleaseNotes               = @'
-# Release Notes v2.19.0
+# Release Notes v3.0.0
 
 ## Overview
-Complete PowerShell/C# port of Microsoft's OffScrubC2R.vbs v2.19 with significant performance improvements.
+The module now wraps the native OfficeScrub DLL directly, exposing a handful of helper commands instead of the previous script-heavy implementation. Original VBScript and C# sources remain in the repo for reference.
 
 ## What's New
-- Native C# library for high-performance operations (10-50x faster)
-- Pre-compiled DLL with automatic fallback to source compilation
-- Parallel processing for registry and file operations
-- Comprehensive logging and error handling
-- Support for PowerShell 7+ and Windows PowerShell 5.1
+- Streamlined PowerShell module focused on loading the native binary
+- Helper functions for creating the orchestrator and checking product scope
+- Repository cleaned to highlight the native binary alongside the original sources
 
 ## Breaking Changes
-- Requires Administrator privileges
-- Minimum PowerShell version is 5.1
-- .NET Framework 4.5 or later required
-
-## Known Issues
-- None
-
-For full changelog, see CHANGELOG.md
+- Legacy script-based functions have been removed in favor of the native wrapper
 '@
 
             # Prerelease string of this module
