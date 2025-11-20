@@ -28,7 +28,7 @@ namespace OfficeScrubNative
 
     public static class OfficeConstants
     {
-        public const string OFFICE_ID = "0000000FF1CE}";
+        public const string OFFICE_ID = "{0000000FF1CE}";
         public const int PROD_LEN = 13;
         public const int SQUISHED = 20;
         public const int COMPRESSED = 32;
