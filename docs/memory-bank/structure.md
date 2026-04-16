@@ -17,6 +17,7 @@ src/
 │   ├── OfficeDetectionService.cs
 │   ├── PreflightService.cs
 │   ├── ScrubPlanner.cs
+│   ├── CommandRunner.cs
 │   └── CleanupExecutor.cs
 └── OfficeScrubC2R.PowerShell/
     ├── GetInstalledOfficeProductsCommand.cs

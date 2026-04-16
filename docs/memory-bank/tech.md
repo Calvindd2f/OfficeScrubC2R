@@ -7,7 +7,7 @@
 
 ## Projects
 
-- `src/OfficeScrubC2R.Core`: netstandard2.0 core library with detection, planning, and guarded cleanup execution.
+- `src/OfficeScrubC2R.Core`: netstandard2.0 core library with detection, planning, guarded cleanup execution, and local Teams/Copilot companion app cleanup.
 - `src/OfficeScrubC2R.PowerShell`: netstandard2.0 binary cmdlet module using `PowerShellStandard.Library`.
 - `tests/OfficeScrubC2R.Core.Tests`: xUnit tests.
 - `tests/OfficeScrubC2R.Tests.ps1`: Pester module contract tests.

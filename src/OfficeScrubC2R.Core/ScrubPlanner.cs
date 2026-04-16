@@ -2,11 +2,18 @@ namespace OfficeScrubC2R
 {
     public static class ScrubPlanner
     {
-        public static ScrubPlan CreatePlan(OfficeC2RState state, bool keepLicense, bool planOnly)
+        public static ScrubPlan CreatePlan(
+            OfficeC2RState state,
+            bool keepLicense,
+            bool planOnly,
+            bool keepTeams = false,
+            bool keepCopilot = false)
         {
             var plan = new ScrubPlan
             {
                 KeepLicense = keepLicense,
+                KeepTeams = keepTeams,
+                KeepCopilot = keepCopilot,
                 PlanOnly = planOnly,
                 State = state,
                 ExecutionStatus = planOnly ? "PlanOnly" : "Ready",
@@ -64,7 +71,31 @@ namespace OfficeScrubC2R
                     "Office licensing data",
                     "Remove Office licensing data."));
 
+            plan.PlannedOperations.Add(keepTeams && keepCopilot
+                ? OperationResult.Skipped(
+                    "CompanionApps",
+                    "RemoveTeamsAndCopilot",
+                    "AppxPackageSet",
+                    "Microsoft Teams,Microsoft Copilot",
+                    "Teams and Copilot cleanup skipped because KeepTeams and KeepCopilot were requested.")
+                : OperationResult.WouldRun(
+                    "CompanionApps",
+                    "RemoveTeamsAndCopilot",
+                    "AppxPackageSet",
+                    GetCompanionPlanTarget(keepTeams, keepCopilot),
+                    "Remove Office-adjacent Teams and Copilot local app packages and remnants."));
+
             return plan;
+        }
+
+        private static string GetCompanionPlanTarget(bool keepTeams, bool keepCopilot)
+        {
+            if (keepTeams)
+            {
+                return "Microsoft Copilot";
+            }
+
+            return keepCopilot ? "Microsoft Teams" : "Microsoft Teams,Microsoft Copilot";
         }
     }
 }

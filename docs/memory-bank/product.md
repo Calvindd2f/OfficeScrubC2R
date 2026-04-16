@@ -9,6 +9,7 @@ OfficeScrubC2R v3 is a hardened binary PowerShell module for inspecting and scru
 - Detects Office C2R products from configuration and uninstall registry evidence.
 - Reports preflight state: elevation, SYSTEM context, Office processes, C2R services, package paths, pending reboot-delete evidence, and issues.
 - Produces structured scrub plans and structured execution results.
+- Removes local Teams and Copilot companion app state by default, with `-KeepTeams` and `-KeepCopilot` preservation switches.
 - Uses explicit 32-bit and 64-bit registry views instead of string-based `Wow6432Node` path rewriting.
 - Emits structured operation diagnostics through `OperationResult`.
 
@@ -18,7 +19,7 @@ OfficeScrubC2R v3 is a hardened binary PowerShell module for inspecting and scru
 - `Test-OfficeC2RState`
 - `Invoke-OfficeScrubC2R`
 
-`Invoke-OfficeScrubC2R` supports `-PlanOnly` and `-WhatIf`. Real destructive execution requires elevation and blocks with `OfficeScrubC2R.AdminRequired` when not elevated.
+`Invoke-OfficeScrubC2R` supports `-PlanOnly` and `-WhatIf`. Real destructive execution requires elevation and blocks with `OfficeScrubC2R.AdminRequired` when not elevated. Teams and Copilot local cleanup is included unless `-KeepTeams` or `-KeepCopilot` is set.
 
 ## Target Users
 

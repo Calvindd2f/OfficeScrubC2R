@@ -47,6 +47,19 @@ Describe 'OfficeScrubC2R binary module contract' {
         $plan.PSObject.TypeNames[0] | Should -Be 'OfficeScrubC2R.ScrubPlan'
         $plan.PlanOnly | Should -BeTrue
         $plan.PlannedOperations | Should -Not -BeNullOrEmpty
+        $plan.PlannedOperations |
+            Where-Object { $_.Step -eq 'CompanionApps' -and $_.Action -eq 'RemoveTeamsAndCopilot' } |
+            Should -Not -BeNullOrEmpty
+    }
+
+    It 'supports keeping Teams and Copilot during planning' {
+        $plan = Invoke-OfficeScrubC2R -PlanOnly -KeepTeams -KeepCopilot
+
+        $plan.KeepTeams | Should -BeTrue
+        $plan.KeepCopilot | Should -BeTrue
+        $plan.PlannedOperations |
+            Where-Object { $_.Step -eq 'CompanionApps' -and $_.Status -eq 'Skipped' } |
+            Should -Not -BeNullOrEmpty
     }
 
     It 'supports WhatIf without destructive execution' {

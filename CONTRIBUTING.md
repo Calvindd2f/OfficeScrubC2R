@@ -10,7 +10,7 @@ Version 3.0.0 is a guarded destructive binary milestone:
 - `Test-OfficeC2RState`
 - `Invoke-OfficeScrubC2R`
 
-`Invoke-OfficeScrubC2R` must continue to require elevation, honor `-PlanOnly` and `-WhatIf`, and return structured operation results. New destructive branches need tests or narrowly documented lab validation.
+`Invoke-OfficeScrubC2R` must continue to require elevation, honor `-PlanOnly` and `-WhatIf`, honor preservation switches such as `-KeepLicense`, `-KeepTeams`, and `-KeepCopilot`, and return structured operation results. New destructive branches need tests or narrowly documented lab validation.
 
 ## Development Setup
 

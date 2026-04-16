@@ -26,7 +26,8 @@ namespace OfficeScrubC2R
             "mavinject32", "werfault", "perfboost", "roamingoffice",
             "officeclicktorun", "officeondemand", "officec2rclient",
             "winword", "excel", "powerpnt", "outlook", "onenote",
-            "mspub", "msaccess", "lync", "skype", "teams"
+            "mspub", "msaccess", "lync", "skype", "teams",
+            "ms-teams", "msteams", "copilot"
         };
 
         public static readonly string[] ClickToRunServiceNames = new[]

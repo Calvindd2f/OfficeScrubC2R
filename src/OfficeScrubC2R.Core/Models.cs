@@ -116,6 +116,8 @@ namespace OfficeScrubC2R
     {
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public bool KeepLicense { get; set; }
+        public bool KeepTeams { get; set; }
+        public bool KeepCopilot { get; set; }
         public bool PlanOnly { get; set; }
         public string ExecutionStatus { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
@@ -128,7 +130,11 @@ namespace OfficeScrubC2R
     {
         public OfficeC2RState State { get; set; } = new OfficeC2RState();
         public bool KeepLicense { get; set; }
+        public bool KeepTeams { get; set; }
+        public bool KeepCopilot { get; set; }
         public bool SkipBuiltInTargets { get; set; }
+        public bool SkipCompanionAppTargets { get; set; }
+        public bool SkipCompanionProfileTargets { get; set; }
         public List<string> ExtraFileSystemTargets { get; } = new List<string>();
         public List<RegistryTarget> ExtraRegistryTargets { get; } = new List<RegistryTarget>();
     }

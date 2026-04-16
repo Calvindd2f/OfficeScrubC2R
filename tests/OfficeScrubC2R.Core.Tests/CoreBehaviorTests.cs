@@ -1,5 +1,8 @@
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using Microsoft.Win32;
 using OfficeScrubC2R;
 using Xunit;
@@ -110,6 +113,34 @@ public sealed class CoreBehaviorTests
         Assert.True(plan.PlanOnly);
         Assert.True(plan.KeepLicense);
         Assert.Contains(plan.PlannedOperations, item => item.Status == OperationStatus.WouldRun);
+        Assert.Contains(plan.PlannedOperations, item =>
+            item.Step == "CompanionApps" &&
+            item.Action == "RemoveTeamsAndCopilot" &&
+            item.Status == OperationStatus.WouldRun);
+    }
+
+    [Fact]
+    public void ScrubPlanner_HonorsCompanionAppKeepFlags()
+    {
+        var state = new OfficeC2RState
+        {
+            IsElevated = true,
+            Is64BitOperatingSystem = true
+        };
+
+        var plan = ScrubPlanner.CreatePlan(
+            state,
+            keepLicense: false,
+            planOnly: true,
+            keepTeams: true,
+            keepCopilot: true);
+
+        Assert.True(plan.KeepTeams);
+        Assert.True(plan.KeepCopilot);
+        Assert.Contains(plan.PlannedOperations, item =>
+            item.Step == "CompanionApps" &&
+            item.Action == "RemoveTeamsAndCopilot" &&
+            item.Status == OperationStatus.Skipped);
     }
 
     [Fact]
@@ -123,7 +154,8 @@ public sealed class CoreBehaviorTests
         var request = new ScrubExecutionRequest
         {
             State = new OfficeC2RState { IsElevated = true, Is64BitOperatingSystem = true },
-            SkipBuiltInTargets = true
+            SkipBuiltInTargets = true,
+            SkipCompanionAppTargets = true
         };
         request.ExtraFileSystemTargets.Add(root);
 
@@ -149,7 +181,8 @@ public sealed class CoreBehaviorTests
         var request = new ScrubExecutionRequest
         {
             State = new OfficeC2RState { IsElevated = true, Is64BitOperatingSystem = true },
-            SkipBuiltInTargets = true
+            SkipBuiltInTargets = true,
+            SkipCompanionAppTargets = true
         };
         request.ExtraRegistryTargets.Add(new RegistryTarget(RegistryHive.CurrentUser, subKey));
 
@@ -171,7 +204,8 @@ public sealed class CoreBehaviorTests
         var request = new ScrubExecutionRequest
         {
             State = new OfficeC2RState { IsElevated = false, Is64BitOperatingSystem = true },
-            SkipBuiltInTargets = true
+            SkipBuiltInTargets = true,
+            SkipCompanionAppTargets = true
         };
 
         var result = new CleanupExecutor().Execute(request);
@@ -180,5 +214,98 @@ public sealed class CoreBehaviorTests
         Assert.Contains(result.ExecutedOperations, item =>
             item.Status == OperationStatus.Blocked &&
             item.ErrorId == "OfficeScrubC2R.AdminRequired");
+    }
+
+    [Fact]
+    public void CleanupExecutor_RemovesTeamsAndCopilotCompanionAppsThroughCommandRunner()
+    {
+        var runner = new RecordingCommandRunner();
+        var request = new ScrubExecutionRequest
+        {
+            State = new OfficeC2RState { IsElevated = true, Is64BitOperatingSystem = true },
+            SkipBuiltInTargets = true,
+            SkipCompanionProfileTargets = true
+        };
+
+        var result = new CleanupExecutor(runner).Execute(request);
+
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Step == "CompanionApps" &&
+            item.Action == "RemoveTeamsAppxPackage" &&
+            item.Status == OperationStatus.Completed);
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Step == "CompanionApps" &&
+            item.Action == "RemoveCopilotAppxPackage" &&
+            item.Status == OperationStatus.Completed);
+        Assert.Contains(runner.PowerShellScripts, script => script.Contains("MSTeams"));
+        Assert.Contains(runner.PowerShellScripts, script => script.Contains("Microsoft.Copilot"));
+        Assert.Contains(runner.Invocations, invocation =>
+            invocation.FileName == "msiexec.exe" &&
+            invocation.Arguments.Contains("{731F6BAA-A986-45A4-8936-7C3AAAAA760B}"));
+    }
+
+    [Fact]
+    public void CleanupExecutor_SkipsCompanionAppsWhenKeepFlagsAreSet()
+    {
+        var runner = new RecordingCommandRunner();
+        var request = new ScrubExecutionRequest
+        {
+            State = new OfficeC2RState { IsElevated = true, Is64BitOperatingSystem = true },
+            KeepTeams = true,
+            KeepCopilot = true,
+            SkipBuiltInTargets = true,
+            SkipCompanionProfileTargets = true
+        };
+
+        var result = new CleanupExecutor(runner).Execute(request);
+
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Step == "CompanionApps" &&
+            item.Action == "RemoveTeams" &&
+            item.Status == OperationStatus.Skipped);
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Step == "CompanionApps" &&
+            item.Action == "RemoveCopilot" &&
+            item.Status == OperationStatus.Skipped);
+        Assert.Empty(runner.Invocations);
+    }
+
+    private sealed class RecordingCommandRunner : ICommandRunner
+    {
+        public List<CommandInvocation> Invocations { get; } = new List<CommandInvocation>();
+
+        public IEnumerable<string> PowerShellScripts =>
+            Invocations
+                .Where(invocation => invocation.FileName == "powershell.exe")
+                .Select(invocation => DecodePowerShellScript(invocation.Arguments));
+
+        public CommandRunResult Run(string fileName, string arguments, int timeoutMilliseconds)
+        {
+            Invocations.Add(new CommandInvocation(fileName, arguments, timeoutMilliseconds));
+            return new CommandRunResult(0, "removed");
+        }
+
+        private static string DecodePowerShellScript(string arguments)
+        {
+            const string marker = "-EncodedCommand ";
+            var markerIndex = arguments.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            Assert.True(markerIndex >= 0, "PowerShell command should use -EncodedCommand.");
+            var encoded = arguments.Substring(markerIndex + marker.Length).Trim().Trim('"');
+            return Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+        }
+    }
+
+    private sealed class CommandInvocation
+    {
+        public CommandInvocation(string fileName, string arguments, int timeoutMilliseconds)
+        {
+            FileName = fileName;
+            Arguments = arguments;
+            TimeoutMilliseconds = timeoutMilliseconds;
+        }
+
+        public string FileName { get; }
+        public string Arguments { get; }
+        public int TimeoutMilliseconds { get; }
     }
 }

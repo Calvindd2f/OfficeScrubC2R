@@ -27,7 +27,7 @@ The repository root does not receive compiled DLLs. Build outputs remain ignored
 
 ## Projects
 
-- `src/OfficeScrubC2R.Core`: detection, registry-view access, preflight state, scrub plans, guarded cleanup execution, and structured operation results.
+- `src/OfficeScrubC2R.Core`: detection, registry-view access, preflight state, scrub plans, guarded cleanup execution including Teams/Copilot companion app cleanup, and structured operation results.
 - `src/OfficeScrubC2R.PowerShell`: binary cmdlets for `Get-InstalledOfficeProducts`, `Test-OfficeC2RState`, and `Invoke-OfficeScrubC2R`.
 - `tests/OfficeScrubC2R.Core.Tests`: xUnit tests for core behavior.
 - `tests/OfficeScrubC2R.Tests.ps1`: Pester tests for the PowerShell module contract.

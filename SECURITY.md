@@ -4,7 +4,7 @@ OfficeScrubC2R is intended for administrators working on failed Microsoft Office
 
 ## Supported Baseline
 
-Version 3.0.0 includes guarded destructive cleanup for a first OffScrubC2R-inspired slice. It requires elevation and reports every attempted operation through structured `OperationResult` records. Full parity, signed releases, destructive-path VM coverage, and reinstall validation are still required before broad production use.
+Version 3.0.0 includes guarded destructive cleanup for a first OffScrubC2R-inspired slice. It requires elevation and reports every attempted operation through structured `OperationResult` records. Local Teams and Copilot companion app cleanup is included by default, with `-KeepTeams` and `-KeepCopilot` available when those apps should be preserved. Full parity, signed releases, destructive-path VM coverage, and reinstall validation are still required before broad production use.
 
 Supported runtime baseline:
 
@@ -33,5 +33,6 @@ A production destructive release must include:
 - published SHA256 checksums
 - CI evidence for Windows PowerShell 5.1 and PowerShell 7+
 - VM test evidence for locked files, denied ACLs, broken C2R state, x86/x64 registry views, stale MSI metadata, and clean Office reinstall after scrub
+- validation that Teams and Copilot local package cleanup behaves as expected without altering tenant-side licensing or policy state
 
 Until those gates exist, treat this project as a lab/pilot cleanup utility rather than a broad production cleanup utility.

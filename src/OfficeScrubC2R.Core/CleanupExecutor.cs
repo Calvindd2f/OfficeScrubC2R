@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Win32;
 
 namespace OfficeScrubC2R
@@ -11,6 +12,8 @@ namespace OfficeScrubC2R
     public sealed class CleanupExecutor
     {
         private const int MoveFileDelayUntilReboot = 0x4;
+        private const string TeamsMachineWideProductCode = "{731F6BAA-A986-45A4-8936-7C3AAAAA760B}";
+        private readonly ICommandRunner _commandRunner;
 
         private static readonly string[] OfficeScheduledTasks =
         {
@@ -86,6 +89,16 @@ namespace OfficeScrubC2R
             new RegistryValueTarget(RegistryHive.CurrentUser, @"SOFTWARE\Microsoft\Office\15.0\CleanC2R", "Rerun")
         };
 
+        public CleanupExecutor()
+            : this(new ProcessCommandRunner())
+        {
+        }
+
+        public CleanupExecutor(ICommandRunner commandRunner)
+        {
+            _commandRunner = commandRunner ?? throw new ArgumentNullException(nameof(commandRunner));
+        }
+
         public ScrubPlan Execute(ScrubExecutionRequest request)
         {
             if (request == null)
@@ -94,7 +107,12 @@ namespace OfficeScrubC2R
             }
 
             var state = request.State ?? new OfficeC2RState();
-            var plan = ScrubPlanner.CreatePlan(state, request.KeepLicense, planOnly: false);
+            var plan = ScrubPlanner.CreatePlan(
+                state,
+                request.KeepLicense,
+                planOnly: false,
+                request.KeepTeams,
+                request.KeepCopilot);
             plan.ExecutionStatus = "Running";
             plan.Message = "Executing Office Click-to-Run cleanup.";
 
@@ -128,7 +146,7 @@ namespace OfficeScrubC2R
         {
             if (!request.SkipBuiltInTargets)
             {
-                foreach (var result in TerminateOfficeProcesses())
+                foreach (var result in TerminateOfficeProcesses(GetProcessNamesForCleanup(request)))
                 {
                     yield return result;
                 }
@@ -142,6 +160,14 @@ namespace OfficeScrubC2R
                 {
                     yield return StopService(serviceName);
                     yield return DeleteService(serviceName);
+                }
+            }
+
+            if (!request.SkipCompanionAppTargets)
+            {
+                foreach (var result in RemoveCompanionApps(request))
+                {
+                    yield return result;
                 }
             }
 
@@ -296,11 +322,41 @@ namespace OfficeScrubC2R
             yield return Path.Combine(localAppData, "Microsoft", "Office", "16.0", "Licensing");
         }
 
-        private static IReadOnlyList<OperationResult> TerminateOfficeProcesses()
+        private static IEnumerable<string> GetProcessNamesForCleanup(ScrubExecutionRequest request)
+        {
+            foreach (var processName in OfficeConstants.OfficeProcesses)
+            {
+                if (request.KeepTeams && IsTeamsProcessName(processName))
+                {
+                    continue;
+                }
+
+                if (request.KeepCopilot && IsCopilotProcessName(processName))
+                {
+                    continue;
+                }
+
+                yield return processName;
+            }
+        }
+
+        private static bool IsTeamsProcessName(string processName)
+        {
+            return string.Equals(processName, "teams", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(processName, "ms-teams", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(processName, "msteams", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCopilotProcessName(string processName)
+        {
+            return string.Equals(processName, "copilot", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyList<OperationResult> TerminateOfficeProcesses(IEnumerable<string> processNames)
         {
             var results = new List<OperationResult>();
 
-            foreach (var processName in OfficeConstants.OfficeProcesses)
+            foreach (var processName in processNames)
             {
                 Process[] processes;
                 try
@@ -342,9 +398,80 @@ namespace OfficeScrubC2R
             return results;
         }
 
-        private static OperationResult DeleteScheduledTask(string taskName)
+        private IEnumerable<OperationResult> RemoveCompanionApps(ScrubExecutionRequest request)
         {
-            var result = RunProcess("schtasks.exe", "/Delete /TN \"" + taskName + "\" /F", 15000);
+            if (request.KeepTeams)
+            {
+                yield return OperationResult.Skipped(
+                    "CompanionApps",
+                    "RemoveTeams",
+                    "Application",
+                    "Microsoft Teams",
+                    "Teams cleanup skipped because KeepTeams was requested.");
+            }
+            else
+            {
+                yield return RunPowerShellCleanup(
+                    "RemoveTeamsAppxPackage",
+                    "AppxPackage",
+                    "*MSTeams*",
+                    CreateRemoveAppxPackagesScript("*MSTeams*", "Teams AppX/MSIX packages"));
+
+                yield return RunPowerShellCleanup(
+                    "RemoveTeamsProvisionedPackage",
+                    "ProvisionedAppxPackage",
+                    "*MSTeams*",
+                    CreateRemoveProvisionedAppxPackagesScript("*MSTeams*", "Teams provisioned AppX/MSIX packages"));
+
+                yield return RemoveTeamsMachineWideInstaller();
+
+                foreach (var result in RemoveTeamsBootstrapper())
+                {
+                    yield return result;
+                }
+
+                if (!request.SkipCompanionProfileTargets)
+                {
+                    foreach (var result in DeleteTeamsProfileRemnants())
+                    {
+                        yield return result;
+                    }
+
+                    foreach (var result in DeleteTeamsRegistryRemnants(request.State.Is64BitOperatingSystem))
+                    {
+                        yield return result;
+                    }
+                }
+            }
+
+            if (request.KeepCopilot)
+            {
+                yield return OperationResult.Skipped(
+                    "CompanionApps",
+                    "RemoveCopilot",
+                    "Application",
+                    "Microsoft Copilot",
+                    "Copilot cleanup skipped because KeepCopilot was requested.");
+            }
+            else
+            {
+                yield return RunPowerShellCleanup(
+                    "RemoveCopilotAppxPackage",
+                    "AppxPackage",
+                    "Microsoft.Copilot",
+                    CreateRemoveAppxPackagesScript("Microsoft.Copilot", "Microsoft Copilot AppX packages"));
+
+                yield return RunPowerShellCleanup(
+                    "RemoveCopilotProvisionedPackage",
+                    "ProvisionedAppxPackage",
+                    "Microsoft.Copilot",
+                    CreateRemoveProvisionedAppxPackagesScript("Microsoft.Copilot", "Microsoft Copilot provisioned AppX packages"));
+            }
+        }
+
+        private OperationResult DeleteScheduledTask(string taskName)
+        {
+            var result = _commandRunner.Run("schtasks.exe", "/Delete /TN \"" + taskName + "\" /F", 15000);
             if (result.ExitCode == 0)
             {
                 return OperationResult.Completed("ScheduledTasks", "DeleteTask", "ScheduledTask", taskName, "Scheduled task deleted.");
@@ -365,9 +492,9 @@ namespace OfficeScrubC2R
                 "OfficeScrubC2R.ScheduledTaskDeleteFailed");
         }
 
-        private static OperationResult StopService(string serviceName)
+        private OperationResult StopService(string serviceName)
         {
-            var result = RunProcess("sc.exe", "stop \"" + serviceName + "\"", 15000);
+            var result = _commandRunner.Run("sc.exe", "stop \"" + serviceName + "\"", 15000);
             if (result.ExitCode == 0)
             {
                 return OperationResult.Completed("Services", "StopService", "Service", serviceName, "Service stop requested.");
@@ -382,9 +509,9 @@ namespace OfficeScrubC2R
             return OperationResult.Blocked("Services", "StopService", "Service", serviceName, result.Output, "OfficeScrubC2R.ServiceStopFailed");
         }
 
-        private static OperationResult DeleteService(string serviceName)
+        private OperationResult DeleteService(string serviceName)
         {
-            var result = RunProcess("sc.exe", "delete \"" + serviceName + "\"", 15000);
+            var result = _commandRunner.Run("sc.exe", "delete \"" + serviceName + "\"", 15000);
             if (result.ExitCode == 0)
             {
                 return OperationResult.Completed("Services", "DeleteService", "Service", serviceName, "Service delete requested.");
@@ -396,6 +523,111 @@ namespace OfficeScrubC2R
             }
 
             return OperationResult.Blocked("Services", "DeleteService", "Service", serviceName, result.Output, "OfficeScrubC2R.ServiceDeleteFailed");
+        }
+
+        private OperationResult RunPowerShellCleanup(string action, string targetKind, string target, string script)
+        {
+            var result = _commandRunner.Run(
+                "powershell.exe",
+                "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + EncodePowerShellCommand(script),
+                120000);
+
+            return ConvertCommandResult(
+                "CompanionApps",
+                action,
+                targetKind,
+                target,
+                result,
+                "OfficeScrubC2R." + action + "Failed");
+        }
+
+        private OperationResult RemoveTeamsMachineWideInstaller()
+        {
+            var result = _commandRunner.Run(
+                "msiexec.exe",
+                "/x " + TeamsMachineWideProductCode + " /qn /norestart",
+                120000);
+
+            return ConvertCommandResult(
+                "CompanionApps",
+                "RemoveTeamsMachineWideInstaller",
+                "MsiProduct",
+                TeamsMachineWideProductCode,
+                result,
+                "OfficeScrubC2R.TeamsMachineWideUninstallFailed");
+        }
+
+        private IEnumerable<OperationResult> RemoveTeamsBootstrapper()
+        {
+            var bootstrapperPath = FindExecutable("teamsbootstrapper.exe");
+            if (string.IsNullOrWhiteSpace(bootstrapperPath))
+            {
+                yield return OperationResult.Skipped(
+                    "CompanionApps",
+                    "RemoveTeamsBootstrapperMachineWide",
+                    "Executable",
+                    "teamsbootstrapper.exe",
+                    "teamsbootstrapper.exe was not found on PATH or in common install locations.");
+                yield break;
+            }
+
+            var result = _commandRunner.Run(
+                bootstrapperPath,
+                "-x -m",
+                120000);
+
+            yield return ConvertCommandResult(
+                "CompanionApps",
+                "RemoveTeamsBootstrapperMachineWide",
+                "Executable",
+                bootstrapperPath,
+                result,
+                "OfficeScrubC2R.TeamsBootstrapperUninstallFailed");
+        }
+
+        private IEnumerable<OperationResult> DeleteTeamsProfileRemnants()
+        {
+            var targets = GetTeamsProfileTargets().ToArray();
+            if (targets.Length == 0)
+            {
+                yield return OperationResult.Skipped(
+                    "CompanionApps",
+                    "DeleteTeamsProfileRemnants",
+                    "DirectorySet",
+                    "Local user profiles",
+                    "No classic Teams profile folders were found.");
+                yield break;
+            }
+
+            foreach (var target in targets)
+            {
+                yield return DeleteFileSystemPath(target, "CompanionApps", "DeleteTeamsProfileRemnants");
+            }
+        }
+
+        private IEnumerable<OperationResult> DeleteTeamsRegistryRemnants(bool is64BitOperatingSystem)
+        {
+            var targets = new List<RegistryTarget>
+            {
+                new RegistryTarget(RegistryHive.CurrentUser, @"Software\Microsoft\Teams"),
+                new RegistryTarget(RegistryHive.CurrentUser, @"Software\Microsoft\Office\Teams")
+            };
+
+            foreach (var sid in GetLoadedUserSids())
+            {
+                targets.Add(new RegistryTarget(RegistryHive.Users, sid + @"\Software\Microsoft\Teams"));
+                targets.Add(new RegistryTarget(RegistryHive.Users, sid + @"\Software\Microsoft\Office\Teams"));
+            }
+
+            foreach (var target in targets)
+            {
+                foreach (var result in DeleteRegistryKey(target, is64BitOperatingSystem))
+                {
+                    result.Step = "CompanionApps";
+                    result.Action = "DeleteTeamsRegistryRemnants";
+                    yield return result;
+                }
+            }
         }
 
         private static IReadOnlyList<OperationResult> DeleteRegistryKey(RegistryTarget target, bool is64BitOperatingSystem)
@@ -651,6 +883,164 @@ namespace OfficeScrubC2R
             return trimmed.Length == 32 ? GuidHelper.GetExpandedGuid(trimmed) : string.Empty;
         }
 
+        private static OperationResult ConvertCommandResult(
+            string step,
+            string action,
+            string targetKind,
+            string target,
+            CommandRunResult result,
+            string errorId)
+        {
+            if (result.ExitCode == 0)
+            {
+                if (result.Output.IndexOf("OfficeScrubC2R:NOOP:", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return OperationResult.Skipped(step, action, targetKind, target, result.Output);
+                }
+
+                return OperationResult.Completed(step, action, targetKind, target, result.Output);
+            }
+
+            if (result.ExitCode == 1605 || result.ExitCode == 1614)
+            {
+                return OperationResult.Skipped(step, action, targetKind, target, "Installer product was not present.");
+            }
+
+            if (result.ExitCode == 3010)
+            {
+                return new OperationResult
+                {
+                    Step = step,
+                    Action = action,
+                    TargetKind = targetKind,
+                    Target = target,
+                    Status = OperationStatus.ScheduledForReboot,
+                    Message = string.IsNullOrWhiteSpace(result.Output) ? "Operation completed and requested a reboot." : result.Output,
+                    RebootScheduled = true
+                };
+            }
+
+            return OperationResult.Blocked(step, action, targetKind, target, result.Output, errorId);
+        }
+
+        private static string CreateRemoveAppxPackagesScript(string packageName, string friendlyName)
+        {
+            return string.Join(
+                Environment.NewLine,
+                "$ErrorActionPreference = 'Stop'",
+                "$packages = @(Get-AppxPackage -Name '" + EscapePowerShellSingleQuoted(packageName) + "' -AllUsers)",
+                "if ($packages.Count -eq 0) { Write-Output 'OfficeScrubC2R:NOOP:No " + EscapePowerShellSingleQuoted(friendlyName) + " found.'; exit 0 }",
+                "foreach ($package in $packages) {",
+                "    Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction Stop",
+                "    Write-Output ('Removed ' + $package.PackageFullName)",
+                "}");
+        }
+
+        private static string CreateRemoveProvisionedAppxPackagesScript(string displayNamePattern, string friendlyName)
+        {
+            return string.Join(
+                Environment.NewLine,
+                "$ErrorActionPreference = 'Stop'",
+                "$packages = @(Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -like '" + EscapePowerShellSingleQuoted(displayNamePattern) + "' })",
+                "if ($packages.Count -eq 0) { Write-Output 'OfficeScrubC2R:NOOP:No " + EscapePowerShellSingleQuoted(friendlyName) + " found.'; exit 0 }",
+                "foreach ($package in $packages) {",
+                "    Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction Stop | Out-Null",
+                "    Write-Output ('Removed provisioned ' + $package.PackageName)",
+                "}");
+        }
+
+        private static string EncodePowerShellCommand(string script)
+        {
+            return Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+        }
+
+        private static string EscapePowerShellSingleQuoted(string value)
+        {
+            return (value ?? string.Empty).Replace("'", "''");
+        }
+
+        private static string FindExecutable(string fileName)
+        {
+            var candidates = new List<string>
+            {
+                Environment.ExpandEnvironmentVariables(@"%ProgramFiles%\Teams Installer\" + fileName),
+                Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Teams Installer\" + fileName),
+                Environment.ExpandEnvironmentVariables(@"%ProgramFiles%\Microsoft Teams\" + fileName),
+                Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Microsoft Teams\" + fileName)
+            };
+
+            var pathValue = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            foreach (var pathPart in pathValue.Split(new[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                candidates.Add(Path.Combine(pathPart.Trim(), fileName));
+            }
+
+            return candidates.FirstOrDefault(candidate =>
+                !string.IsNullOrWhiteSpace(candidate) &&
+                candidate.IndexOf('%') < 0 &&
+                File.Exists(candidate)) ?? string.Empty;
+        }
+
+        private static IEnumerable<string> GetTeamsProfileTargets()
+        {
+            var usersRoot = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\", "Users");
+            if (!Directory.Exists(usersRoot))
+            {
+                yield break;
+            }
+
+            foreach (var profilePath in Directory.GetDirectories(usersRoot))
+            {
+                var profileName = Path.GetFileName(profilePath);
+                if (string.Equals(profileName, "Public", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(profileName, "Default", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(profileName, "Default User", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(profileName, "All Users", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var targets = new[]
+                {
+                    Path.Combine(profilePath, "AppData", "Local", "Microsoft", "Teams"),
+                    Path.Combine(profilePath, "AppData", "Roaming", "Microsoft", "Teams"),
+                    Path.Combine(profilePath, "AppData", "Local", "SquirrelTemp"),
+                    Path.Combine(profilePath, "AppData", "Local", "Microsoft", "TeamsMeetingAddin")
+                };
+
+                foreach (var target in targets.Where(target => Directory.Exists(target) || File.Exists(target)))
+                {
+                    yield return target;
+                }
+            }
+        }
+
+        private static IReadOnlyList<string> GetLoadedUserSids()
+        {
+            var sids = new List<string>();
+
+            try
+            {
+                using (var users = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Default))
+                {
+                    foreach (var sid in users.GetSubKeyNames())
+                    {
+                        if (sid.StartsWith("S-1-5-21-", StringComparison.OrdinalIgnoreCase) &&
+                            sid.IndexOf("_Classes", StringComparison.OrdinalIgnoreCase) < 0)
+                        {
+                            sids.Add(sid);
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return sids;
+            }
+
+            return sids;
+        }
+
         private static OperationResult DeleteFileSystemPath(string path, string step = "Files", string action = "DeleteDirectory")
         {
             try
@@ -753,61 +1143,8 @@ namespace OfficeScrubC2R
             }
         }
 
-        private static ProcessRunResult RunProcess(string fileName, string arguments, int timeoutMilliseconds)
-        {
-            try
-            {
-                using (var process = new Process())
-                {
-                    process.StartInfo = new ProcessStartInfo
-                    {
-                        FileName = fileName,
-                        Arguments = arguments,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-
-                    process.Start();
-                    if (!process.WaitForExit(timeoutMilliseconds))
-                    {
-                        try
-                        {
-                            process.Kill();
-                        }
-                        catch (Exception exception)
-                        {
-                            return new ProcessRunResult(-1, fileName + " timed out. Process kill also failed: " + exception.GetType().Name + ": " + exception.Message);
-                        }
-
-                        return new ProcessRunResult(-1, fileName + " timed out.");
-                    }
-
-                    var output = (process.StandardOutput.ReadToEnd() + Environment.NewLine + process.StandardError.ReadToEnd()).Trim();
-                    return new ProcessRunResult(process.ExitCode, output);
-                }
-            }
-            catch (Exception exception)
-            {
-                return new ProcessRunResult(-1, exception.GetType().Name + ": " + exception.Message);
-            }
-        }
-
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
-
-        private sealed class ProcessRunResult
-        {
-            public ProcessRunResult(int exitCode, string output)
-            {
-                ExitCode = exitCode;
-                Output = output ?? string.Empty;
-            }
-
-            public int ExitCode { get; }
-            public string Output { get; }
-        }
 
         private sealed class RegistryCleanupTargets
         {

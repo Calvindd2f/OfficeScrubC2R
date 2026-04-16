@@ -15,12 +15,23 @@ namespace OfficeScrubC2R.PowerShell
         public SwitchParameter KeepLicense { get; set; }
 
         [Parameter]
+        public SwitchParameter KeepTeams { get; set; }
+
+        [Parameter]
+        public SwitchParameter KeepCopilot { get; set; }
+
+        [Parameter]
         public SwitchParameter PassThru { get; set; }
 
         protected override void ProcessRecord()
         {
             var state = new PreflightService().GetState();
-            var plan = ScrubPlanner.CreatePlan(state, KeepLicense.IsPresent, PlanOnly.IsPresent);
+            var plan = ScrubPlanner.CreatePlan(
+                state,
+                KeepLicense.IsPresent,
+                PlanOnly.IsPresent,
+                KeepTeams.IsPresent,
+                KeepCopilot.IsPresent);
 
             if (PlanOnly.IsPresent)
             {
@@ -56,7 +67,9 @@ namespace OfficeScrubC2R.PowerShell
             var request = new ScrubExecutionRequest
             {
                 State = state,
-                KeepLicense = KeepLicense.IsPresent
+                KeepLicense = KeepLicense.IsPresent,
+                KeepTeams = KeepTeams.IsPresent,
+                KeepCopilot = KeepCopilot.IsPresent
             };
 
             var result = new CleanupExecutor().Execute(request);

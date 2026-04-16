@@ -1,6 +1,6 @@
 # OfficeScrubC2R
 
-OfficeScrubC2R is a hardened binary PowerShell module for inspecting and scrubbing Microsoft Office Click-to-Run state. Version 3.0.0 now includes guarded destructive execution for a first VBS-inspired cleanup slice: Office process termination, Office scheduled task deletion, Click-to-Run service stop/delete, C2R registry cleanup, known/detected C2R folder deletion with reboot scheduling fallback, and optional current-user license cache preservation.
+OfficeScrubC2R is a hardened binary PowerShell module for inspecting and scrubbing Microsoft Office Click-to-Run state. Version 3.0.0 now includes guarded destructive execution for a first VBS-inspired cleanup slice: Office process termination, Office scheduled task deletion, Click-to-Run service stop/delete, C2R registry cleanup, known/detected C2R folder deletion with reboot scheduling fallback, Teams and Copilot local app cleanup, and optional current-user license cache preservation.
 
 This repository includes Microsoft `OffScrubC2R.vbs` and earlier conversion sources as reference material. The shipped module is built from the SDK-style projects under `src/`.
 
@@ -64,7 +64,10 @@ Real execution requires an elevated shell. Use `-Confirm:$false` only when you a
 ```powershell
 Invoke-OfficeScrubC2R -Confirm:$false
 Invoke-OfficeScrubC2R -KeepLicense -Confirm:$false
+Invoke-OfficeScrubC2R -KeepTeams -KeepCopilot -Confirm:$false
 ```
+
+By default, real execution also removes Office-adjacent Teams and Copilot local app state that the original VBScript predates: Teams AppX/MSIX packages, provisioned Teams packages, the classic Teams machine-wide installer, classic Teams per-profile remnants, and the local Microsoft Copilot AppX/provisioned package. Use `-KeepTeams` or `-KeepCopilot` when those apps should survive the Office scrub. This does not remove tenant-side Microsoft 365 Copilot licenses, policy, or cloud app state.
 
 ## Structured Output
 
@@ -97,4 +100,4 @@ CI validates the module in both Windows PowerShell 5.1 and PowerShell 7.
 
 ## Production Readiness
 
-Version 3.0.0 is a usable destructive milestone, not full OffScrubC2R parity yet. It does not yet run the Office Deployment Tool uninstall flow, every Windows Installer metadata branch, every COM TypeLib branch, all shell shortcut/taskband cleanup, or multi-profile license cleanup from the original VBScript. Before broad production use, the project still needs signed release artifacts, published checksums, a VM-based destructive test matrix, full scrub parity, and clean Office reinstall validation after cleanup.
+Version 3.0.0 is a usable destructive milestone, not full OffScrubC2R parity yet. It does not yet run the Office Deployment Tool uninstall flow, every Windows Installer metadata branch, every COM TypeLib branch, all shell shortcut/taskband cleanup, or multi-profile license cleanup from the original VBScript. Teams and Copilot cleanup covers local app/package state only. Before broad production use, the project still needs signed release artifacts, published checksums, a VM-based destructive test matrix, full scrub parity, and clean Office reinstall validation after cleanup.
