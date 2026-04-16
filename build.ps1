@@ -1,82 +1,55 @@
-#
-# Build script for OfficeScrubC2R Native DLL
-# Compiles OfficeScrubC2R-Native.cs into OfficeScrubNative.dll
-#
-
 [CmdletBinding()]
 param(
-    [switch]$Clean
+    [switch]$Clean,
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Release'
 )
 
-$ErrorActionPreference = "Stop"
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ErrorActionPreference = 'Stop'
+$repoRoot = $PSScriptRoot
+$artifactRoot = Join-Path $repoRoot 'artifacts'
+$moduleRoot = Join-Path $artifactRoot 'module'
+$moduleLib = Join-Path $moduleRoot 'lib\netstandard2.0'
+$projectPath = Join-Path $repoRoot 'src\OfficeScrubC2R.PowerShell\OfficeScrubC2R.PowerShell.csproj'
+$buildOutput = Join-Path $repoRoot "src\OfficeScrubC2R.PowerShell\bin\$Configuration\netstandard2.0"
 
-Write-Host "OfficeScrubC2R Native Build Script" -ForegroundColor Cyan
-Write-Host "==================================`n" -ForegroundColor Cyan
+if ($Clean -and (Test-Path -LiteralPath $artifactRoot)) {
+    Remove-Item -LiteralPath $artifactRoot -Recurse -Force
+}
 
-# Clean previous build
-if ($Clean -and (Test-Path "$scriptDir\OfficeScrubNative.dll")) {
-    Write-Host "Cleaning previous build..." -ForegroundColor Yellow
-    Remove-Item "$scriptDir\OfficeScrubNative.dll" -Force
-    if (Test-Path "$scriptDir\OfficeScrubNative.pdb") {
-        Remove-Item "$scriptDir\OfficeScrubNative.pdb" -Force
+if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
+    throw "Project file not found: $projectPath"
+}
+
+Write-Host "Building OfficeScrubC2R binary module ($Configuration)" -ForegroundColor Cyan
+dotnet build $projectPath -c $Configuration -nologo
+
+if (-not (Test-Path -LiteralPath (Join-Path $buildOutput 'OfficeScrubC2R.dll') -PathType Leaf)) {
+    throw "Expected binary module was not created: $(Join-Path $buildOutput 'OfficeScrubC2R.dll')"
+}
+
+New-Item -ItemType Directory -Force -Path $moduleLib | Out-Null
+
+Get-ChildItem -LiteralPath $buildOutput -File |
+    Where-Object { $_.Extension -in '.dll', '.pdb', '.deps.json' } |
+    Copy-Item -Destination $moduleLib -Force
+
+foreach ($file in @('OfficeScrubC2R.psd1', 'OfficeScrubC2R.psm1', 'LICENSE', 'README.md', 'CHANGELOG.md', 'SECURITY.md')) {
+    $source = Join-Path $repoRoot $file
+    if (Test-Path -LiteralPath $source -PathType Leaf) {
+        Copy-Item -LiteralPath $source -Destination $moduleRoot -Force
     }
 }
 
-# Locate csc.exe
-$cscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-if (-not (Test-Path $cscPath)) {
-    Write-Error "C# compiler not found at: $cscPath"
-    exit 1
-}
+$checksumPath = Join-Path $artifactRoot 'checksums.sha256'
+Get-ChildItem -LiteralPath $moduleRoot -Recurse -File |
+    Where-Object { $_.Extension -in '.dll', '.psd1', '.psm1' } |
+    Sort-Object FullName |
+    ForEach-Object {
+        $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
+        '{0}  {1}' -f $hash.Hash.ToLowerInvariant(), $_.FullName.Substring($moduleRoot.Length + 1).Replace('\', '/')
+    } |
+    Set-Content -LiteralPath $checksumPath -Encoding ASCII
 
-# Check source file
-$sourceFile = Join-Path $scriptDir "OfficeScrubC2R-Native.cs"
-if (-not (Test-Path $sourceFile)) {
-    Write-Error "Source file not found: $sourceFile"
-    exit 1
-}
-
-Write-Host "Source file: $sourceFile" -ForegroundColor Gray
-Write-Host "Compiler: $cscPath" -ForegroundColor Gray
-Write-Host ""
-
-# Compile
-Write-Host "Compiling..." -ForegroundColor Yellow
-
-$outputDll = Join-Path $scriptDir "OfficeScrubNative.dll"
-$systemManagementDll = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Management.dll"
-$microsoftCSharpDll = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Microsoft.CSharp.dll"
-
-$compileArgs = @(
-    "/target:library",
-    "/out:$outputDll",
-    "/reference:$systemManagementDll",
-    "/reference:$microsoftCSharpDll",
-    "/optimize+",
-    "/warn:4",
-    $sourceFile
-)
-
-try {
-    $process = Start-Process -FilePath $cscPath -ArgumentList $compileArgs -NoNewWindow -Wait -PassThru
-
-    if ($process.ExitCode -eq 0) {
-        Write-Host "`nBuild succeeded!" -ForegroundColor Green
-
-        if (Test-Path $outputDll) {
-            $fileInfo = Get-Item $outputDll
-            Write-Host "Output: $outputDll" -ForegroundColor Green
-            Write-Host "Size: $($fileInfo.Length) bytes" -ForegroundColor Gray
-            Write-Host "Modified: $($fileInfo.LastWriteTime)" -ForegroundColor Gray
-        }
-    }
-    else {
-        Write-Error "Build failed with exit code: $($process.ExitCode)"
-        exit $process.ExitCode
-    }
-}
-catch {
-    Write-Error "Build failed: $_"
-    exit 1
-}
+Write-Host "Module artifact: $moduleRoot" -ForegroundColor Green
+Write-Host "Checksums: $checksumPath" -ForegroundColor Green

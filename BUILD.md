@@ -1,94 +1,57 @@
-# Building OfficeScrubC2R Native Components
+# Building OfficeScrubC2R
 
-## Overview
+OfficeScrubC2R v3 builds a binary PowerShell module from the SDK-style projects in `src/`.
 
-The OfficeScrubC2R utilities use a native C# component (`OfficeScrubNative.dll`) for performance-critical operations like registry manipulation, file operations, and process management.
-
-## Building the DLL
-
-### Quick Build
-
-Run the build script:
-
-```powershell
-.\build.ps1
-```
-
-To clean and rebuild:
+## Quick Build
 
 ```powershell
 .\build.ps1 -Clean
 ```
 
-### Manual Build
+The build creates:
 
-If you need to compile manually:
-
-```cmd
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe ^
-  /target:library ^
-  /out:OfficeScrubNative.dll ^
-  /reference:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Management.dll" ^
-  /reference:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Microsoft.CSharp.dll" ^
-  OfficeScrubC2R-Native.cs
+```text
+artifacts/
+  checksums.sha256
+  module/
+    OfficeScrubC2R.psd1
+    OfficeScrubC2R.psm1
+    lib/
+      netstandard2.0/
+        OfficeScrubC2R.dll
+        OfficeScrubC2R.Core.dll
+        dependency DLLs
 ```
 
-## How It Works
+The repository root does not receive compiled DLLs. Build outputs remain ignored artifacts.
 
-The PowerShell module (`OfficeScrubC2R-Utilities.psm1`) uses the following loading strategy:
+## Projects
 
-1. **First**: Attempts to load the pre-compiled `OfficeScrubNative.dll` (fastest)
-2. **Fallback**: If DLL not found, compiles `OfficeScrubC2R-Native.cs` inline (slower startup)
-
-This approach provides:
-
-- **Performance**: No compilation delay when DLL is present
-- **Portability**: Can still run with just the .cs source file
-- **Flexibility**: Easy development and testing
-
-## Distribution
-
-For distribution, you can include either:
-
-- **Recommended**: Both `OfficeScrubNative.dll` and `OfficeScrubC2R-Native.cs`
-- **Source-only**: Just `OfficeScrubC2R-Native.cs` (will compile on first use)
-- **Binary-only**: Just `OfficeScrubNative.dll` (fastest, but no fallback)
+- `src/OfficeScrubC2R.Core`: detection, registry-view access, preflight state, scrub plans, and structured operation results.
+- `src/OfficeScrubC2R.PowerShell`: binary cmdlets for `Get-InstalledOfficeProducts`, `Test-OfficeC2RState`, and `Invoke-OfficeScrubC2R`.
+- `tests/OfficeScrubC2R.Core.Tests`: xUnit tests for core behavior.
+- `tests/OfficeScrubC2R.Tests.ps1`: Pester tests for the PowerShell module contract.
 
 ## Requirements
 
-- .NET Framework 4.0 or later
-- Windows PowerShell 5.1 or PowerShell 7+
-- Administrator privileges (for Office removal operations)
+- Windows 10 or Windows 11
+- Windows PowerShell 5.1 and/or PowerShell 7+
+- .NET SDK 8.0+
+- Pester 5+ for PowerShell contract tests
+- PSScriptAnalyzer for PowerShell linting
 
-## Architecture
+## Validation
 
-The native DLL contains:
+```powershell
+.\build.ps1 -Clean
+dotnet test .\tests\OfficeScrubC2R.Core.Tests\OfficeScrubC2R.Core.Tests.csproj
+Invoke-Pester -Path .\tests\OfficeScrubC2R.Tests.ps1 -CI
+Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
+.\.github\scripts\Validate-Module.ps1 -SkipBuild
+```
 
-- **RegistryHelper**: High-performance registry operations with WOW64 support
-- **FileHelper**: Robust file/folder deletion with reboot scheduling
-- **ProcessHelper**: Process termination and monitoring
-- **WindowsInstallerHelper**: MSI metadata cleanup
-- **TypeLibHelper**: COM type library cleanup
-- **LicenseHelper**: Office license and SPP cleanup
-- **ServiceHelper**: Windows service management
-- **GuidHelper**: GUID encoding/decoding utilities
-- **ShellHelper**: Shell integration (taskbar pins, start menu, etc.)
+`Validate-Module.ps1` verifies the manifest, exact command exports, generated checksums, and absence of tracked `.dll` or `.pdb` files.
 
-## Troubleshooting
+## Artifact Policy
 
-### DLL Load Failure
-
-If you see "Failed to load DLL", check:
-
-1. DLL is in the same directory as the .psm1 file
-2. DLL is not blocked (run `Unblock-File OfficeScrubNative.dll`)
-3. .NET Framework 4.0+ is installed
-
-### Compilation Errors
-
-The fallback inline compilation requires:
-
-- System.Management.dll
-- Microsoft.CSharp.dll
-
-These are included with Windows by default.
+Compiled binaries are not source files. Do not commit DLLs or PDBs. Release automation should publish signed artifacts and SHA256 checksums from `artifacts/module`.

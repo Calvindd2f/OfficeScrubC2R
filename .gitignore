@@ -2,6 +2,8 @@
 *.dll
 *.pdb
 *.exe
+**/bin/
+**/obj/
 
 # Logs
 *.log
@@ -49,10 +51,6 @@ scratch/
 # User-specific files
 *.local.ps1
 *.private.ps1
-
-# Keep these artifacts (exceptions to above rules)
-!OfficeScrubNative.dll
-
 
 # Verification artifacts
 artifacts/

@@ -1,95 +1,92 @@
-# Overview
+# OfficeScrubC2R
 
-<details>
-<summary>Relevant source files</summary>
+OfficeScrubC2R is a hardened binary PowerShell module for inspecting Microsoft Office Click-to-Run state and planning future cleanup work. Version 3.0.0 is intentionally non-destructive: it detects installed Office C2R products, reports preflight state, and produces a scrub plan, but it does not delete files, registry keys, services, licenses, scheduled tasks, or installer metadata.
 
-</details>
+This repository includes Microsoft `OffScrubC2R.vbs` and earlier conversion sources as reference material. The shipped module is built from the SDK-style projects under `src/`.
 
+## Supported Commands
 
+| Command | Purpose | Destructive |
+| --- | --- | --- |
+| `Get-InstalledOfficeProducts` | Reads Office C2R configuration and uninstall registry evidence across explicit 32-bit and 64-bit registry views. | No |
+| `Test-OfficeC2RState` | Reports elevation/SYSTEM status, C2R products, package paths, services, running Office processes, pending reboot-delete evidence, and preflight issues. | No |
+| `Invoke-OfficeScrubC2R -PlanOnly` | Returns a structured plan describing cleanup actions that a future full scrub implementation may perform. | No |
+| `Invoke-OfficeScrubC2R -WhatIf` | Exercises PowerShell `ShouldProcess` behavior and returns the same non-destructive plan. | No |
+| `Invoke-OfficeScrubC2R` | Blocks real cleanup with a terminating error. | No |
 
-OfficeScrubC2R is a PowerShell module that wraps a native C# library (`OfficeScrubNative.dll`) to perform deep cleanup of Microsoft Office Click-to-Run installations. The module serves as a replacement for Microsoft's legacy `OffScrubC2R.vbs` (v2.19) with 10-50x performance improvements through compiled code and direct Windows API access.
+`Invoke-OfficeScrubC2R` uses the stable error id `OfficeScrubC2R.DestructiveExecutionNotSupported` when destructive execution is attempted.
 
-## What Problem Does It Solve?
+## Requirements
 
-Office Click-to-Run installations occasionally fail to uninstall through standard Windows mechanisms (`Programs and Features`, ODT uninstall, or `setup.exe /uninstall`). When this occurs, residual registry keys, files, Windows Installer metadata, and COM registrations prevent clean reinstallation. OfficeScrubC2R provides forensic-level cleanup across eight Windows subsystems: Registry (HKLM/HKCU/HKCR with WOW64 support), File System (with locked file handling), Processes, Services, Windows Installer metadata, COM Type Libraries, Software Protection Platform (SPP/OSPP), and Shell Integration.
+- Windows 10 or Windows 11
+- Windows PowerShell 5.1 or PowerShell 7+
+- .NET Framework 4.7.2 or later for Windows PowerShell hosts
+- .NET SDK 8.0+ to build and test from source
 
-## Why Does It Exist?
+Windows 7 SP1 and .NET 4.5 are no longer advertised as the production support floor for the v3 binary baseline.
 
-Microsoft's original VBScript solution (`OffScrubC2R.vbs`) suffers from performance limitations inherent to interpreted scripting and COM automation. The PowerShell/C# hybrid architecture achieves dramatic performance gains through:
+## Build
 
-- **Compiled C# Code**: Native `OfficeScrubNative.dll` replaces interpreted VBScript
-- **Direct Win32 APIs**: P/Invoke to `advapi32.dll`, `kernel32.dll`, `shell32.dll` bypasses COM overhead
-- **Parallel Processing**: Multi-threaded operations via `Task.Run()` and `Task.WaitAll()`
-- **Optimized Data Structures**: `HashSet<string>` for O(1) lookups vs. linear array scans
-- **Static Caching**: Reduced repetitive API calls in registry enumeration
-
-## Capabilities and Scope
-
-The system targets Office 2013, 2016, 2019, and Office 365 Click-to-Run installations on Windows 7 SP1 through Windows 11 (both x86 and x64 architectures).
-
-### Core Cleanup Operations
-
-| Subsystem | Implemented By | Key Operations |
-|-----------|---------------|----------------|
-| **Registry** | `RegistryHelper` | Recursive key deletion across HKLM, HKCU, HKCR with WOW64 dual-path access (`KEY_WOW64_64KEY`, `KEY_WOW64_32KEY`) |
-| **File System** | `FileHelper` | Directory deletion with `cmd.exe rd /s /q` optimization; locked file handling via `MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT)` |
-| **Processes** | `ProcessHelper` | Parallel process termination via `Task.Run()`; `GetProcessesUsingPath()` for file lock detection |
-| **Windows Installer** | `WindowsInstallerHelper` | Product/Component/UpgradeCode cleanup using GUID transformation (`GetExpandedGuid`, `GetCompressedGuid`, `GetDecodedGuid`) |
-| **COM Type Libraries** | `TypeLibHelper` | Unregister type libraries from `HKCR\TypeLib` and `HKCR\Interface` |
-| **SPP/OSPP Licensing** | `LicenseHelper` | Clear Office Software Protection Platform tokens (optional via `-KeepLicense` parameter) |
-| **Shell Integration** | `ShellHelper` | Remove published components, taskbar pins, start menu items using `Shell.Application` COM object |
-| **Services** | `ServiceHelper` | Delete Office-related Windows services via WMI |
-
-## System Architecture
-
-OfficeScrubC2R implements a two-layer hybrid architecture: a PowerShell wrapper layer for user interaction and a native C# library for performance-critical operations.
-
-### Architecture Overview
-
-```mermaid
-graph TB
-    subgraph PowerShell["PowerShell Module Layer"]
-        PSM["OfficeScrubC2R.psm1"]
-        PSD1["OfficeScrubC2R.psd1"]
-    end
-    
-    subgraph Native["Native C# Layer (OfficeScrubNative.dll)"]
-        ORCH["OfficeScrubOrchestrator"]
-        
-        subgraph Helpers["Helper Classes"]
-            REG["RegistryHelper"]
-            FILE["FileHelper"]
-            PROC["ProcessHelper"]
-            WI["WindowsInstallerHelper"]
-            TL["TypeLibHelper"]
-            LIC["LicenseHelper"]
-            SVC["ServiceHelper"]
-            SH["ShellHelper"]
-            GUID["GuidHelper"]
-        end
-    end
-    
-    subgraph Win32["Windows APIs"]
-        ADVAPI["advapi32.dll<br/>RegOpenKeyEx<br/>RegDeleteKeyEx"]
-        KERNEL["kernel32.dll<br/>MoveFileEx<br/>TerminateProcess"]
-        SHELL["shell32.dll<br/>Shell.Application"]
-    end
-    
-    PSM --> ORCH
-    PSD1 --> PSM
-    
-    ORCH --> REG
-    ORCH --> FILE
-    ORCH --> PROC
-    ORCH --> WI
-    ORCH --> TL
-    ORCH --> LIC
-    ORCH --> SVC
-    ORCH --> SH
-    ORCH --> GUID
-    
-    REG --> ADVAPI
-    FILE --> KERNEL
-    PROC --> KERNEL
-    SH --> SHELL
+```powershell
+.\build.ps1 -Clean
 ```
+
+The build script compiles the binary cmdlets and writes package-ready output to:
+
+```text
+artifacts/module/
+```
+
+It also writes SHA256 checksums to:
+
+```text
+artifacts/checksums.sha256
+```
+
+Compiled DLLs and PDBs are build or release artifacts only. They should not be committed to the repository.
+
+## Usage From Source
+
+Build first, then import the root manifest:
+
+```powershell
+.\build.ps1
+Import-Module .\OfficeScrubC2R.psd1 -Force
+
+Get-InstalledOfficeProducts
+Test-OfficeC2RState
+Invoke-OfficeScrubC2R -PlanOnly
+Invoke-OfficeScrubC2R -WhatIf
+```
+
+Attempting real execution is blocked in this milestone:
+
+```powershell
+Invoke-OfficeScrubC2R -Confirm:$false
+```
+
+## Structured Output
+
+The core output types are:
+
+- `OfficeScrubC2R.OfficeProductInfo`
+- `OfficeScrubC2R.OfficeC2RState`
+- `OfficeScrubC2R.ScrubPlan`
+- `OfficeScrubC2R.OperationResult`
+
+`OperationResult` includes the step, action, target kind, target, registry hive/view when applicable, status, message, exception type, HRESULT, Win32 error, reboot scheduling state, and stable error id.
+
+## Test
+
+```powershell
+dotnet test .\tests\OfficeScrubC2R.Core.Tests\OfficeScrubC2R.Core.Tests.csproj
+Invoke-Pester -Path .\tests\OfficeScrubC2R.Tests.ps1 -CI
+Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
+.\.github\scripts\Validate-Module.ps1
+```
+
+CI validates the module in both Windows PowerShell 5.1 and PowerShell 7.
+
+## Production Readiness
+
+Version 3.0.0 is a hardened baseline, not a production scrubber. Before destructive cleanup can be enabled, the project still needs signed release artifacts, published checksums, a VM-based destructive test matrix, full scrub parity, and clean Office reinstall validation after cleanup.
