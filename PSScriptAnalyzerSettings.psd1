@@ -1,11 +1,11 @@
 @{
-    'ExcludeRules' = @('*')
-    'Rules'        = @{
-        'PSAvoidUsingCmdletAliases'        = @{
-            'allowlist' = @('set', 'get', 'nv', 'Add-Type')
-        }
-        'PSAvoidUsingPlainTextForPassword' = @{
-            'allowlist' = @('set', 'get', 'nv', 'Add-Type')
+    Severity     = @('Error', 'Warning')
+    ExcludeRules = @(
+        'PSAvoidUsingWriteHost'
+    )
+    Rules        = @{
+        PSAvoidUsingCmdletAliases = @{
+            AllowList = @()
         }
     }
 }

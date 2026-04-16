@@ -1,98 +1,31 @@
 # OfficeScrubC2R.psm1
-# Lightweight wrapper that exposes the native OfficeScrub C# binary via PowerShell.
-# The module intentionally focuses on the converted DLL that uses native Windows APIs
-# while keeping the original reference sources in the repository for contrast.
+# Host-aware loader for the binary cmdlet module built from src/.
 
 $script:ModuleRoot = $PSScriptRoot
-$script:NativeAssemblyPath = Join-Path $script:ModuleRoot 'OfficeScrubNative.dll'
-$script:NativeAssembly = $null
+$script:ArtifactRoot = Join-Path $script:ModuleRoot 'artifacts'
+$script:CurrentModulePathFile = Join-Path $script:ArtifactRoot 'current-module.txt'
 
-function Import-OfficeScrubNative {
-    [CmdletBinding()]
-    param(
-        # Path to the OfficeScrub native DLL. Defaults to the copy next to the module.
-        [string]$Path = $script:NativeAssemblyPath
-    )
-
-    $resolvedPath = (Resolve-Path -Path $Path -ErrorAction Stop).ProviderPath
-
-    if (-not (Test-Path -Path $resolvedPath -PathType Leaf)) {
-        throw "Native assembly not found at '$resolvedPath'. Ensure OfficeScrubNative.dll is present alongside the module."
-    }
-
-    if ($script:NativeAssembly -and $script:NativeAssembly.Location -eq $resolvedPath) {
-        return $script:NativeAssembly
-    }
-
-    $script:NativeAssembly = [AppDomain]::CurrentDomain.GetAssemblies() |
-        Where-Object { $_.Location -eq $resolvedPath }
-
-    if (-not $script:NativeAssembly) {
-        $script:NativeAssembly = [System.Reflection.Assembly]::LoadFrom($resolvedPath)
-    }
-
-    return $script:NativeAssembly
-}
-
-function New-OfficeScrubOrchestrator {
-    [CmdletBinding()]
-    param(
-        # Whether to use 64-bit registry/file views when interacting with the OS.
-        [bool]$Is64Bit = [Environment]::Is64BitOperatingSystem
-    )
-
-    Import-OfficeScrubNative | Out-Null
-    return [OfficeScrubNative.OfficeScrubOrchestrator]::new($Is64Bit)
-}
-
-function Test-OfficeC2RPath {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [OfficeScrubNative.OfficeScrubOrchestrator]$Orchestrator
-    )
-
-    if (-not $PSBoundParameters.ContainsKey('Orchestrator') -or -not $Orchestrator) {
-        $Orchestrator = New-OfficeScrubOrchestrator
-    }
-
-    return $Orchestrator.IsC2RPath($Path)
-}
-
-function Test-OfficeProductScope {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][string]$ProductCode,
-        [OfficeScrubNative.OfficeScrubOrchestrator]$Orchestrator
-    )
-
-    if (-not $PSBoundParameters.ContainsKey('Orchestrator') -or -not $Orchestrator) {
-        $Orchestrator = New-OfficeScrubOrchestrator
-    }
-
-    return $Orchestrator.IsInScope($ProductCode)
-}
-
-function Get-OfficeScrubHelpers {
-    [CmdletBinding()]
-    param(
-        [OfficeScrubNative.OfficeScrubOrchestrator]$Orchestrator
-    )
-
-    if (-not $PSBoundParameters.ContainsKey('Orchestrator') -or -not $Orchestrator) {
-        $Orchestrator = New-OfficeScrubOrchestrator
-    }
-
-    [pscustomobject]@{
-        RegistryHelper         = $Orchestrator.Registry
-        FileHelper             = $Orchestrator.Files
-        ProcessHelper          = $Orchestrator.Processes
-        ShellHelper            = $Orchestrator.Shell
-        WindowsInstallerHelper = $Orchestrator.WindowsInstaller
-        TypeLibHelper          = $Orchestrator.TypeLib
-        LicenseHelper          = $Orchestrator.License
-        ServiceHelper          = $Orchestrator.Services
+$script:CurrentArtifactBinary = $null
+if (Test-Path -LiteralPath $script:CurrentModulePathFile -PathType Leaf) {
+    $script:CurrentArtifactRoot = Get-Content -LiteralPath $script:CurrentModulePathFile -TotalCount 1
+    if (-not [string]::IsNullOrWhiteSpace($script:CurrentArtifactRoot)) {
+        $script:CurrentArtifactBinary = Join-Path $script:ArtifactRoot (Join-Path $script:CurrentArtifactRoot 'lib\netstandard2.0\OfficeScrubC2R.dll')
     }
 }
 
-Export-ModuleMember -Function Import-OfficeScrubNative, New-OfficeScrubOrchestrator, Test-OfficeC2RPath, Test-OfficeProductScope, Get-OfficeScrubHelpers
+$script:BinaryCandidates = @(
+    (Join-Path $script:ModuleRoot 'lib\netstandard2.0\OfficeScrubC2R.dll'),
+    $script:CurrentArtifactBinary,
+    (Join-Path $script:ModuleRoot 'artifacts\module\lib\netstandard2.0\OfficeScrubC2R.dll')
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+$script:BinaryModulePath = $script:BinaryCandidates |
+    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+    Select-Object -First 1
+
+if (-not $script:BinaryModulePath) {
+    $searched = $script:BinaryCandidates -join [Environment]::NewLine
+    throw "OfficeScrubC2R binary module was not found. Run '.\build.ps1' first. Searched:$([Environment]::NewLine)$searched"
+}
+
+Import-Module -Name $script:BinaryModulePath -Force -Global

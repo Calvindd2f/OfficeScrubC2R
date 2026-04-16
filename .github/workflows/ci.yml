@@ -9,100 +9,83 @@ on:
 
 jobs:
   test:
-    name: Test Module
+    name: Build and Test
     runs-on: windows-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup PowerShell
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install PowerShell test tools
         shell: pwsh
         run: |
-          $PSVersionTable
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
 
-      - name: Build native DLL
+      - name: Build binary module
+        shell: pwsh
+        run: .\build.ps1 -Clean
+
+      - name: Run xUnit tests
+        shell: pwsh
+        run: dotnet test .\tests\OfficeScrubC2R.Core.Tests\OfficeScrubC2R.Core.Tests.csproj -c Release
+
+      - name: Run Pester module tests
+        shell: pwsh
+        run: Invoke-Pester -Path .\tests\OfficeScrubC2R.Tests.ps1 -CI
+
+      - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          .\build.ps1 -Clean
-          if (-not (Test-Path ".\OfficeScrubNative.dll")) {
-            throw "DLL was not created"
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
+          if ($results) {
+            $results | Format-Table -AutoSize
+            throw "PSScriptAnalyzer found $($results.Count) issue(s)."
           }
 
-      - name: Test module import
+      - name: Validate module in PowerShell 7
         shell: pwsh
-        run: |
-          Import-Module .\OfficeScrubC2R.psd1 -Force -Verbose
-          Get-Module OfficeScrubC2R
+        run: .\.github\scripts\Validate-Module.ps1 -SkipBuild
 
-      - name: Test module functions
-        shell: pwsh
+      - name: Validate module in Windows PowerShell
+        shell: powershell
         run: |
           Import-Module .\OfficeScrubC2R.psd1 -Force
-
-          # Test function availability
-          $commands = Get-Command -Module OfficeScrubC2R
-          Write-Host "Available commands: $($commands.Name -join ', ')"
-
-          # Test detection only (safe to run in CI)
-          # Note: This requires admin but we'll catch the error
-          try {
-            Get-InstalledOfficeProducts -ErrorAction Stop
+          $expected = @('Get-InstalledOfficeProducts', 'Invoke-OfficeScrubC2R', 'Test-OfficeC2RState')
+          $actual = Get-Command -Module OfficeScrubC2R | Select-Object -ExpandProperty Name | Sort-Object
+          if (Compare-Object -ReferenceObject $expected -DifferenceObject $actual) {
+            throw "Unexpected command exports. Expected: $($expected -join ', '); Actual: $($actual -join ', ')"
           }
-          catch {
-            Write-Host "Expected error (no admin): $_"
-          }
+          Test-OfficeC2RState | Out-Null
 
-      - name: Validate manifest
+      - name: Verify source hygiene
         shell: pwsh
         run: |
-          $manifest = Test-ModuleManifest -Path .\OfficeScrubC2R.psd1
-          Write-Host "Module version: $($manifest.Version)"
-          Write-Host "Module name: $($manifest.Name)"
-          Write-Host "PowerShell version: $($manifest.PowerShellVersion)"
-
-  validate:
-    name: Validate PowerShell Gallery Compatibility
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Build DLL
-        shell: pwsh
-        run: .\build.ps1
-
-      - name: Test manifest
-        shell: pwsh
-        run: |
-          $manifest = Test-ModuleManifest -Path .\OfficeScrubC2R.psd1
-          if (-not $manifest) {
-            throw "Manifest validation failed"
+          $trackedBinaries = @(git ls-files '*.dll' '*.pdb' | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+          if ($trackedBinaries.Count -gt 0) {
+            throw "Compiled binaries must not be tracked: $($trackedBinaries -join ', ')"
           }
 
-      - name: Check required files
-        shell: pwsh
-        run: |
-          $requiredFiles = @(
-            'OfficeScrubC2R.psd1',
-            'OfficeScrubC2R.psm1',
-            'OfficeScrubNative.dll',
-            'LICENSE',
-            'README.md'
-          )
-
-          foreach ($file in $requiredFiles) {
-            if (-not (Test-Path $file)) {
-              throw "Required file missing: $file"
-            }
+          $pathRewriteMatches = Get-ChildItem .\src -Recurse -File -Filter *.cs |
+            Select-String -Pattern 'GetWow64Key|Wow6432Node'
+          if ($pathRewriteMatches) {
+            $pathRewriteMatches | Format-Table -AutoSize
+            throw 'Registry view handling in src/ must use RegistryView, not manual Wow6432Node path rewriting.'
           }
 
-      - name: Verify no blocked files
-        shell: pwsh
-        run: |
-          Get-ChildItem -Recurse -File | ForEach-Object {
-            if ((Get-Item $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue)) {
-              throw "Blocked file found: $($_.FullName)"
-            }
+          if (-not (Test-Path .\artifacts\checksums.sha256 -PathType Leaf)) {
+            throw 'Checksum file was not generated.'
           }
+
+      - name: Publish module to PSGallery
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: Publish-Module -Path . -NuGetApiKey $env:PSGALLERY_API_KEY -Verbose

@@ -1,91 +1,52 @@
-# Quick module validation script
-Write-Host "`n=== OfficeScrubC2R Module Validation ===" -ForegroundColor Cyan
+[CmdletBinding()]
+param(
+    [switch]$SkipBuild
+)
 
-$results = @{}
+$ErrorActionPreference = 'Stop'
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
+$expectedCommands = @('Get-InstalledOfficeProducts', 'Invoke-OfficeScrubC2R', 'Test-OfficeC2RState')
 
-# Test manifest
+Push-Location $repoRoot
 try {
-    $manifest = Test-ModuleManifest -Path .\OfficeScrubC2R.psd1 -ErrorAction Stop
-    $results['Manifest'] = "PASS (v$($manifest.Version))"
-}
-catch {
-    $results['Manifest'] = "FAIL: $_"
-}
-
-# Test DLL
-if (Test-Path .\OfficeScrubNative.dll) {
-    $results['DLL'] = "PASS"
-}
-else {
-    $results['DLL'] = "FAIL: Not found"
-}
-
-# Test module import
-try {
-    Import-Module .\OfficeScrubC2R.psd1 -Force -ErrorAction Stop
-    $results['Import'] = "PASS"
-    
-    # Test commands
-    $commands = Get-Command -Module OfficeScrubC2R
-    $results['Commands'] = "PASS ($($commands.Count) exported)"
-    
-    # Test aliases
-    $aliases = Get-Alias | Where-Object { $_.ModuleName -eq 'OfficeScrubC2R' }
-    $results['Aliases'] = "PASS ($($aliases.Count) aliases)"
-}
-catch {
-    $results['Import'] = "FAIL: $_"
-    $results['Commands'] = "SKIP"
-    $results['Aliases'] = "SKIP"
-}
-
-# Test required files
-$requiredFiles = @('LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md')
-$missingFiles = @()
-foreach ($file in $requiredFiles) {
-    if (-not (Test-Path $file)) {
-        $missingFiles += $file
+    if (-not $SkipBuild) {
+        .\build.ps1 -Clean
     }
-}
-if ($missingFiles.Count -eq 0) {
-    $results['Required Files'] = "PASS"
-}
-else {
-    $results['Required Files'] = "FAIL: Missing $($missingFiles -join ', ')"
-}
 
-# Test help
-try {
-    $help = Get-Help Invoke-OfficeScrubC2R -ErrorAction Stop
-    if ($help.Synopsis) {
-        $results['Help'] = "PASS"
+    $manifest = Test-ModuleManifest -Path .\OfficeScrubC2R.psd1
+    if ($manifest.Version.ToString() -ne '3.0.0') {
+        throw "Unexpected module version: $($manifest.Version)"
     }
-    else {
-        $results['Help'] = "FAIL: No synopsis"
+
+    Import-Module .\OfficeScrubC2R.psd1 -Force
+    $actualCommands = Get-Command -Module OfficeScrubC2R | Select-Object -ExpandProperty Name | Sort-Object
+    if (Compare-Object -ReferenceObject $expectedCommands -DifferenceObject $actualCommands) {
+        throw "Unexpected command exports. Expected: $($expectedCommands -join ', '); Actual: $($actualCommands -join ', ')"
     }
-}
-catch {
-    $results['Help'] = "FAIL: $_"
-}
 
-# Display results
-Write-Host ""
-$maxKeyLength = ($results.Keys | Measure-Object -Property Length -Maximum).Maximum
-foreach ($key in $results.Keys | Sort-Object) {
-    $value = $results[$key]
-    $color = if ($value -like "PASS*") { 'Green' } elseif ($value -like "FAIL*") { 'Red' } else { 'Yellow' }
-    Write-Host ("{0,-$($maxKeyLength + 2)}: {1}" -f $key, $value) -ForegroundColor $color
-}
+    $trackedBinaries = @(git ls-files '*.dll' '*.pdb' | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+    if ($trackedBinaries.Count -gt 0) {
+        throw "Compiled binaries must not be tracked: $($trackedBinaries -join ', ')"
+    }
 
-# Summary
-$passed = ($results.Values | Where-Object { $_ -like "PASS*" }).Count
-$total = $results.Count
-Write-Host "`n=== Summary: $passed/$total checks passed ===" -ForegroundColor $(if ($passed -eq $total) { 'Green' } else { 'Yellow' })
+    if (-not (Test-Path .\artifacts\checksums.sha256 -PathType Leaf)) {
+        throw 'Checksum file was not generated.'
+    }
 
-if ($passed -eq $total) {
-    Write-Host "`nModule is ready for publication!" -ForegroundColor Green
-}
-else {
-    Write-Host "`nSome checks failed. Review above." -ForegroundColor Yellow
-}
+    if (-not (Test-Path .\artifacts\current-psgallery-module.txt -PathType Leaf)) {
+        throw 'PSGallery package pointer was not generated.'
+    }
 
+    $galleryRelativePath = Get-Content -LiteralPath .\artifacts\current-psgallery-module.txt -TotalCount 1
+    $galleryModulePath = Join-Path (Resolve-Path .\artifacts) $galleryRelativePath
+    if ((Split-Path -Leaf $galleryModulePath) -ne 'OfficeScrubC2R') {
+        throw "PSGallery package folder must be named OfficeScrubC2R: $galleryModulePath"
+    }
+
+    Test-ModuleManifest -Path (Join-Path $galleryModulePath 'OfficeScrubC2R.psd1') | Out-Null
+
+    Write-Host 'OfficeScrubC2R module validation passed.' -ForegroundColor Green
+}
+finally {
+    Pop-Location
+}
