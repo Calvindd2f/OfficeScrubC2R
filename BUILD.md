@@ -13,6 +13,8 @@ The build creates:
 ```text
 artifacts/
   checksums.sha256
+  current-module.txt
+  current-psgallery-module.txt
   module/
     OfficeScrubC2R.psd1
     OfficeScrubC2R.psm1
@@ -21,6 +23,14 @@ artifacts/
         OfficeScrubC2R.dll
         OfficeScrubC2R.Core.dll
         dependency DLLs
+  psgallery/
+    OfficeScrubC2R/
+      OfficeScrubC2R.psd1
+      OfficeScrubC2R.psm1
+      lib/
+        netstandard2.0/
+          OfficeScrubC2R.dll
+          OfficeScrubC2R.Core.dll
 ```
 
 The repository root does not receive compiled DLLs. Build outputs remain ignored artifacts.
@@ -54,6 +64,13 @@ Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
 
 If PowerShell has already imported a previous artifact, Windows can hold DLL locks under `artifacts/module`. `build.ps1 -Clean` falls back to a timestamped `artifacts/module-*` folder and records it in `artifacts/current-module.txt`; the root loader reads that file on the next import.
 
+PowerShell Gallery publishing requires the publish path folder to match the module name. Use the generated package path from `artifacts/current-psgallery-module.txt`:
+
+```powershell
+$galleryModule = Join-Path (Resolve-Path .\artifacts) (Get-Content .\artifacts\current-psgallery-module.txt)
+Publish-Module -Path $galleryModule -Repository PSGallery -NuGetApiKey $env:PSGALLERY_API_KEY
+```
+
 ## Artifact Policy
 
-Compiled binaries are not source files. Do not commit DLLs or PDBs. Release automation should publish signed artifacts and SHA256 checksums from `artifacts/module`.
+Compiled binaries are not source files. Do not commit DLLs or PDBs. Release automation should publish signed artifacts and SHA256 checksums from `artifacts/module` and publish the Gallery package from the generated `artifacts/psgallery/OfficeScrubC2R` layout.

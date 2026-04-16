@@ -33,6 +33,18 @@ try {
         throw 'Checksum file was not generated.'
     }
 
+    if (-not (Test-Path .\artifacts\current-psgallery-module.txt -PathType Leaf)) {
+        throw 'PSGallery package pointer was not generated.'
+    }
+
+    $galleryRelativePath = Get-Content -LiteralPath .\artifacts\current-psgallery-module.txt -TotalCount 1
+    $galleryModulePath = Join-Path (Resolve-Path .\artifacts) $galleryRelativePath
+    if ((Split-Path -Leaf $galleryModulePath) -ne 'OfficeScrubC2R') {
+        throw "PSGallery package folder must be named OfficeScrubC2R: $galleryModulePath"
+    }
+
+    Test-ModuleManifest -Path (Join-Path $galleryModulePath 'OfficeScrubC2R.psd1') | Out-Null
+
     Write-Host 'OfficeScrubC2R module validation passed.' -ForegroundColor Green
 }
 finally {

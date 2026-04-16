@@ -10,7 +10,10 @@ $repoRoot = $PSScriptRoot
 $artifactRoot = Join-Path $repoRoot 'artifacts'
 $moduleRoot = Join-Path $artifactRoot 'module'
 $moduleLib = Join-Path $moduleRoot 'lib\netstandard2.0'
+$galleryRoot = Join-Path $artifactRoot 'psgallery'
+$galleryModuleRoot = Join-Path $galleryRoot 'OfficeScrubC2R'
 $currentModulePathFile = Join-Path $artifactRoot 'current-module.txt'
+$currentGalleryModulePathFile = Join-Path $artifactRoot 'current-psgallery-module.txt'
 $projectPath = Join-Path $repoRoot 'src\OfficeScrubC2R.PowerShell\OfficeScrubC2R.PowerShell.csproj'
 $buildOutput = Join-Path $repoRoot "src\OfficeScrubC2R.PowerShell\bin\$Configuration\netstandard2.0"
 
@@ -22,7 +25,21 @@ if ($Clean -and (Test-Path -LiteralPath $artifactRoot)) {
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
         $moduleRoot = Join-Path $artifactRoot "module-$stamp"
         $moduleLib = Join-Path $moduleRoot 'lib\netstandard2.0'
+        $galleryRoot = Join-Path $artifactRoot "psgallery-$stamp"
+        $galleryModuleRoot = Join-Path $galleryRoot 'OfficeScrubC2R'
         Write-Warning "Could not remove '$artifactRoot' because files may be loaded by PowerShell. Writing fresh artifact to '$moduleRoot'."
+    }
+}
+
+if (Test-Path -LiteralPath $galleryRoot) {
+    try {
+        Remove-Item -LiteralPath $galleryRoot -Recurse -Force
+    }
+    catch {
+        $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $galleryRoot = Join-Path $artifactRoot "psgallery-$stamp"
+        $galleryModuleRoot = Join-Path $galleryRoot 'OfficeScrubC2R'
+        Write-Warning "Could not remove '$galleryRoot'. Writing fresh PSGallery package to '$galleryModuleRoot'."
     }
 }
 
@@ -50,6 +67,10 @@ foreach ($file in @('OfficeScrubC2R.psd1', 'OfficeScrubC2R.psm1', 'LICENSE', 'RE
     }
 }
 
+New-Item -ItemType Directory -Force -Path $galleryModuleRoot | Out-Null
+Get-ChildItem -LiteralPath $moduleRoot -Force |
+    Copy-Item -Destination $galleryModuleRoot -Recurse -Force
+
 $checksumPath = Join-Path $artifactRoot 'checksums.sha256'
 Get-ChildItem -LiteralPath $moduleRoot -Recurse -File |
     Where-Object { $_.Extension -in '.dll', '.psd1', '.psm1' } |
@@ -62,6 +83,9 @@ Get-ChildItem -LiteralPath $moduleRoot -Recurse -File |
 
 $relativeModuleRoot = $moduleRoot.Substring($artifactRoot.Length + 1)
 Set-Content -LiteralPath $currentModulePathFile -Value $relativeModuleRoot -Encoding ASCII
+$relativeGalleryModuleRoot = $galleryModuleRoot.Substring($artifactRoot.Length + 1)
+Set-Content -LiteralPath $currentGalleryModulePathFile -Value $relativeGalleryModuleRoot -Encoding ASCII
 
 Write-Host "Module artifact: $moduleRoot" -ForegroundColor Green
+Write-Host "PSGallery package: $galleryModuleRoot" -ForegroundColor Green
 Write-Host "Checksums: $checksumPath" -ForegroundColor Green
