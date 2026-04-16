@@ -21,6 +21,15 @@ namespace OfficeScrubC2R.PowerShell
         public SwitchParameter KeepCopilot { get; set; }
 
         [Parameter]
+        public SwitchParameter Quiet { get; set; }
+
+        [Parameter]
+        public SwitchParameter Force { get; set; }
+
+        [Parameter]
+        public SwitchParameter RemoveAll { get; set; }
+
+        [Parameter]
         public SwitchParameter PassThru { get; set; }
 
         protected override void ProcessRecord()
@@ -39,11 +48,13 @@ namespace OfficeScrubC2R.PowerShell
                 return;
             }
 
-            if (MyInvocation.BoundParameters.ContainsKey("WhatIf"))
+            if ((!Force.IsPresent || IsWhatIfInvocation()) &&
+                !ShouldProcess("Office Click-to-Run installation", "Scrub Office C2R"))
             {
-                ShouldProcess("Office Click-to-Run installation", "Scrub Office C2R");
-                plan.ExecutionStatus = "WhatIf";
-                plan.Message = "WhatIf requested; no cleanup operations were executed.";
+                plan.ExecutionStatus = IsWhatIfInvocation() ? "WhatIf" : "NotExecuted";
+                plan.Message = IsWhatIfInvocation()
+                    ? "WhatIf requested; no cleanup operations were executed."
+                    : "ShouldProcess declined; no cleanup operations were executed.";
                 WriteObject(plan);
                 return;
             }
@@ -58,12 +69,6 @@ namespace OfficeScrubC2R.PowerShell
                 return;
             }
 
-            if (!ShouldProcess("Office Click-to-Run installation", "Scrub Office C2R"))
-            {
-                WriteObject(plan);
-                return;
-            }
-
             var request = new ScrubExecutionRequest
             {
                 State = state,
@@ -74,6 +79,11 @@ namespace OfficeScrubC2R.PowerShell
 
             var result = new CleanupExecutor().Execute(request);
             WriteObject(result);
+        }
+
+        private bool IsWhatIfInvocation()
+        {
+            return MyInvocation.BoundParameters.ContainsKey("WhatIf");
         }
     }
 }

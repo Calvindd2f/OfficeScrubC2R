@@ -1085,12 +1085,12 @@ namespace OfficeScrubC2R
 
         private static void ClearDirectoryAttributes(string path)
         {
-            foreach (var directory in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
+            foreach (var directory in EnumerateDirectoriesSafely(path))
             {
                 ClearFileAttributes(directory);
             }
 
-            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            foreach (var file in EnumerateFilesSafely(path))
             {
                 ClearFileAttributes(file);
             }
@@ -1109,18 +1109,65 @@ namespace OfficeScrubC2R
 
             if (Directory.Exists(path))
             {
-                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                foreach (var file in EnumerateFilesSafely(path))
                 {
                     scheduled = MoveFileEx(file, null!, MoveFileDelayUntilReboot) || scheduled;
                 }
 
-                foreach (var directory in Directory.GetDirectories(path, "*", SearchOption.AllDirectories).OrderByDescending(item => item.Length))
+                foreach (var directory in EnumerateDirectoriesSafely(path).OrderByDescending(item => item.Length))
                 {
                     scheduled = MoveFileEx(directory, null!, MoveFileDelayUntilReboot) || scheduled;
                 }
             }
 
             return MoveFileEx(path, null!, MoveFileDelayUntilReboot) || scheduled;
+        }
+
+        private static IEnumerable<string> EnumerateFilesSafely(string root)
+        {
+            foreach (var directory in EnumerateDirectoriesSafely(root).Prepend(root))
+            {
+                string[] files;
+                try
+                {
+                    files = Directory.GetFiles(directory);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                foreach (var file in files)
+                {
+                    yield return file;
+                }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateDirectoriesSafely(string root)
+        {
+            var pending = new Stack<string>();
+            pending.Push(root);
+
+            while (pending.Count > 0)
+            {
+                var current = pending.Pop();
+                string[] children;
+                try
+                {
+                    children = Directory.GetDirectories(current);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                foreach (var child in children)
+                {
+                    yield return child;
+                    pending.Push(child);
+                }
+            }
         }
 
         private static IEnumerable<RegistryView> GetRegistryViews(bool is64BitOperatingSystem)

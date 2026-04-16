@@ -20,7 +20,7 @@ namespace OfficeScrubC2R
         public string Output { get; }
     }
 
-    internal sealed class ProcessCommandRunner : ICommandRunner
+    public sealed class ProcessCommandRunner : ICommandRunner
     {
         public CommandRunResult Run(string fileName, string arguments, int timeoutMilliseconds)
         {
@@ -39,6 +39,9 @@ namespace OfficeScrubC2R
                     };
 
                     process.Start();
+                    var outputTask = process.StandardOutput.ReadToEndAsync();
+                    var errorTask = process.StandardError.ReadToEndAsync();
+
                     if (!process.WaitForExit(timeoutMilliseconds))
                     {
                         try
@@ -53,7 +56,7 @@ namespace OfficeScrubC2R
                         return new CommandRunResult(-1, fileName + " timed out.");
                     }
 
-                    var output = (process.StandardOutput.ReadToEnd() + Environment.NewLine + process.StandardError.ReadToEnd()).Trim();
+                    var output = (outputTask.Result + Environment.NewLine + errorTask.Result).Trim();
                     return new CommandRunResult(process.ExitCode, output);
                 }
             }

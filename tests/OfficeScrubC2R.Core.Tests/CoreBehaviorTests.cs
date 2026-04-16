@@ -270,6 +270,31 @@ public sealed class CoreBehaviorTests
         Assert.Empty(runner.Invocations);
     }
 
+    [Fact]
+    public void CleanupExecutor_DoesNotUseFragileAllDirectoriesEnumeration()
+    {
+        var sourcePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "OfficeScrubC2R.Core", "CleanupExecutor.cs"));
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.DoesNotContain("SearchOption.AllDirectories", source);
+    }
+
+    [Fact]
+    public void ProcessCommandRunner_CapturesStdoutAndStderrWithoutSequentialReadDeadlock()
+    {
+        var script = "$stdout = 'o' * 100000; $stderr = 'e' * 100000; [Console]::Out.Write($stdout); [Console]::Error.Write($stderr)";
+        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+
+        var result = new ProcessCommandRunner().Run(
+            "powershell.exe",
+            "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded,
+            30000);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(new string('o', 100), result.Output);
+        Assert.Contains(new string('e', 100), result.Output);
+    }
+
     private sealed class RecordingCommandRunner : ICommandRunner
     {
         public List<CommandInvocation> Invocations { get; } = new List<CommandInvocation>();

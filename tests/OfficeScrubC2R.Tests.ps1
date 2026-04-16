@@ -70,6 +70,10 @@ Describe 'OfficeScrubC2R binary module contract' {
         $plan.PlannedOperations | Should -Not -BeNullOrEmpty
     }
 
+    It 'accepts legacy v2 invocation switches for compatibility' {
+        { Invoke-OfficeScrubC2R -Quiet -Force -RemoveAll -WhatIf } | Should -Not -Throw
+    }
+
     It 'blocks real destructive execution when not elevated with a stable error id' {
         $state = Test-OfficeC2RState
         if ($state.IsElevated) {
