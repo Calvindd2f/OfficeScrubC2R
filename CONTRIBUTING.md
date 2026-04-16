@@ -4,13 +4,13 @@ Thank you for helping harden OfficeScrubC2R.
 
 ## Current Scope
 
-Version 3.0.0 is a non-destructive binary baseline. Contributions should preserve this contract unless a future issue explicitly enables destructive scrub execution:
+Version 3.0.0 is a guarded destructive binary milestone:
 
 - `Get-InstalledOfficeProducts`
 - `Test-OfficeC2RState`
 - `Invoke-OfficeScrubC2R`
 
-`Invoke-OfficeScrubC2R` must continue to block real cleanup outside `-PlanOnly` and `-WhatIf` until full scrub parity, signing, VM testing, and reinstall validation are complete.
+`Invoke-OfficeScrubC2R` must continue to require elevation, honor `-PlanOnly` and `-WhatIf`, and return structured operation results. New destructive branches need tests or narrowly documented lab validation.
 
 ## Development Setup
 
@@ -67,4 +67,4 @@ Do not include real endpoint secrets, tenant identifiers, product keys, or unred
 
 ## Release Notes
 
-Release notes must call out whether the release is still non-destructive or enables any cleanup behavior. Any destructive release must document signing, checksums, VM coverage, and reinstall validation evidence.
+Release notes must call out whether the release is detection-only, planning-only, or enables cleanup behavior. Any destructive release must document signing, checksums, VM coverage, and reinstall validation evidence.

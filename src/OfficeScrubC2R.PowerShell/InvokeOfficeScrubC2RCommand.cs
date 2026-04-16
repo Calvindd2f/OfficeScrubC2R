@@ -31,19 +31,36 @@ namespace OfficeScrubC2R.PowerShell
             if (MyInvocation.BoundParameters.ContainsKey("WhatIf"))
             {
                 ShouldProcess("Office Click-to-Run installation", "Scrub Office C2R");
+                plan.ExecutionStatus = "WhatIf";
+                plan.Message = "WhatIf requested; no cleanup operations were executed.";
                 WriteObject(plan);
                 return;
             }
 
-            var blocked = ScrubPlanner.CreateBlockedExecutionResult();
-            var exception = new InvalidOperationException(blocked.Message);
-            var error = new ErrorRecord(
-                exception,
-                blocked.ErrorId,
-                ErrorCategory.NotImplemented,
-                "Office Click-to-Run");
+            if (!state.IsElevated)
+            {
+                ThrowTerminatingError(new ErrorRecord(
+                    new UnauthorizedAccessException("Administrator privileges are required for destructive Office cleanup. Start an elevated PowerShell session and rerun Invoke-OfficeScrubC2R."),
+                    "OfficeScrubC2R.AdminRequired",
+                    ErrorCategory.PermissionDenied,
+                    "Administrator"));
+                return;
+            }
 
-            ThrowTerminatingError(error);
+            if (!ShouldProcess("Office Click-to-Run installation", "Scrub Office C2R"))
+            {
+                WriteObject(plan);
+                return;
+            }
+
+            var request = new ScrubExecutionRequest
+            {
+                State = state,
+                KeepLicense = KeepLicense.IsPresent
+            };
+
+            var result = new CleanupExecutor().Execute(request);
+            WriteObject(result);
         }
     }
 }

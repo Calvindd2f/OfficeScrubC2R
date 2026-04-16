@@ -16,7 +16,8 @@ src/
 │   ├── RegistryAccess.cs
 │   ├── OfficeDetectionService.cs
 │   ├── PreflightService.cs
-│   └── ScrubPlanner.cs
+│   ├── ScrubPlanner.cs
+│   └── CleanupExecutor.cs
 └── OfficeScrubC2R.PowerShell/
     ├── GetInstalledOfficeProductsCommand.cs
     ├── TestOfficeC2RStateCommand.cs
@@ -46,6 +47,7 @@ Reference files are not the v3 runtime implementation.
 ```text
 artifacts/
 ├── checksums.sha256
+├── current-module.txt
 └── module/
     ├── OfficeScrubC2R.psd1
     ├── OfficeScrubC2R.psm1

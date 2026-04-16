@@ -2,8 +2,6 @@ namespace OfficeScrubC2R
 {
     public static class ScrubPlanner
     {
-        public const string DestructiveExecutionNotSupportedErrorId = "OfficeScrubC2R.DestructiveExecutionNotSupported";
-
         public static ScrubPlan CreatePlan(OfficeC2RState state, bool keepLicense, bool planOnly)
         {
             var plan = new ScrubPlan
@@ -11,8 +9,10 @@ namespace OfficeScrubC2R
                 KeepLicense = keepLicense,
                 PlanOnly = planOnly,
                 State = state,
-                ExecutionStatus = "PlanOnly",
-                Message = "This milestone is non-destructive. The plan describes actions that a future full scrub implementation may perform."
+                ExecutionStatus = planOnly ? "PlanOnly" : "Ready",
+                Message = planOnly
+                    ? "The plan describes the cleanup actions Invoke-OfficeScrubC2R will run outside -PlanOnly/-WhatIf."
+                    : "The cleanup plan is ready to execute."
             };
 
             plan.PlannedOperations.Add(OperationResult.WouldRun(
@@ -20,21 +20,21 @@ namespace OfficeScrubC2R
                 "ValidatePrivileges",
                 "Privilege",
                 "Administrator",
-                "Validate elevation and SYSTEM readiness before destructive cleanup."));
+                "Validate elevation before destructive cleanup."));
 
             plan.PlannedOperations.Add(OperationResult.WouldRun(
                 "Processes",
                 "TerminateOfficeProcesses",
                 "ProcessSet",
                 "OfficeProcesses",
-                "Terminate Office-related processes after explicit destructive execution is implemented."));
+                "Terminate Office-related processes."));
 
             plan.PlannedOperations.Add(OperationResult.WouldRun(
                 "Services",
                 "StopAndDeleteClickToRunServices",
                 "ServiceSet",
                 "ClickToRunSvc,OfficeClickToRun",
-                "Stop and delete Click-to-Run services after explicit destructive execution is implemented."));
+                "Stop and delete Click-to-Run services."));
 
             plan.PlannedOperations.Add(OperationResult.WouldRun(
                 "Registry",
@@ -62,20 +62,9 @@ namespace OfficeScrubC2R
                     "RemoveOfficeLicensing",
                     "LicenseStore",
                     "Office licensing data",
-                    "Remove Office licensing data after explicit destructive execution is implemented."));
+                    "Remove Office licensing data."));
 
             return plan;
-        }
-
-        public static OperationResult CreateBlockedExecutionResult()
-        {
-            return OperationResult.Blocked(
-                "Invoke",
-                "ExecuteScrub",
-                "OfficeInstallation",
-                "Office Click-to-Run",
-                "Destructive Office cleanup is intentionally blocked in the hardened baseline. Use -PlanOnly or -WhatIf; full scrub execution belongs to a later parity milestone.",
-                DestructiveExecutionNotSupportedErrorId);
         }
     }
 }

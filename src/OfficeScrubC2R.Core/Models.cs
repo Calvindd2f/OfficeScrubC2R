@@ -121,5 +121,41 @@ namespace OfficeScrubC2R
         public string Message { get; set; } = string.Empty;
         public OfficeC2RState State { get; set; } = new OfficeC2RState();
         public List<OperationResult> PlannedOperations { get; } = new List<OperationResult>();
+        public List<OperationResult> ExecutedOperations { get; } = new List<OperationResult>();
+    }
+
+    public sealed class ScrubExecutionRequest
+    {
+        public OfficeC2RState State { get; set; } = new OfficeC2RState();
+        public bool KeepLicense { get; set; }
+        public bool SkipBuiltInTargets { get; set; }
+        public List<string> ExtraFileSystemTargets { get; } = new List<string>();
+        public List<RegistryTarget> ExtraRegistryTargets { get; } = new List<RegistryTarget>();
+    }
+
+    public sealed class RegistryTarget
+    {
+        public RegistryTarget(RegistryHive hive, string subKey)
+        {
+            Hive = hive;
+            SubKey = subKey;
+        }
+
+        public RegistryHive Hive { get; }
+        public string SubKey { get; }
+    }
+
+    public sealed class RegistryValueTarget
+    {
+        public RegistryValueTarget(RegistryHive hive, string subKey, string valueName)
+        {
+            Hive = hive;
+            SubKey = subKey;
+            ValueName = valueName;
+        }
+
+        public RegistryHive Hive { get; }
+        public string SubKey { get; }
+        public string ValueName { get; }
     }
 }

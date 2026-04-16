@@ -15,6 +15,8 @@ The project follows semantic versioning.
 - Structured output types for products, preflight state, scrub plans, and operation results.
 - Explicit 32-bit and 64-bit registry view access through `RegistryView`.
 - Non-destructive scrub planning through `Invoke-OfficeScrubC2R -PlanOnly` and `-WhatIf`.
+- Guarded destructive execution through `Invoke-OfficeScrubC2R` when run elevated.
+- Cleanup executor steps for Office process termination, Office scheduled task deletion, Click-to-Run service stop/delete, C2R registry key/value deletion through explicit registry views, known/detected C2R folder deletion, reboot delete scheduling fallback, and current-user licensing cache deletion unless `-KeepLicense` is used.
 - xUnit tests for core behavior and Pester tests for module import/command behavior.
 - CI gates for build, tests, PowerShell 5.1 import, PowerShell 7 import, analyzer checks, source hygiene, and checksum generation.
 
@@ -32,7 +34,8 @@ The project follows semantic versioning.
 
 ### Security
 
-- Destructive scrub execution is blocked with the stable error id `OfficeScrubC2R.DestructiveExecutionNotSupported`.
+- Destructive scrub execution requires elevation and blocks with `OfficeScrubC2R.AdminRequired` when not elevated.
+- Full OffScrubC2R parity remains incomplete; broad production use still requires signed artifacts, VM destructive-path coverage, and clean reinstall validation.
 
 ## Historical Notes
 

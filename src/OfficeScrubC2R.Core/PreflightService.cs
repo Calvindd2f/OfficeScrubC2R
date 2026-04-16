@@ -58,7 +58,7 @@ namespace OfficeScrubC2R
                 "CollectState",
                 "OfficeC2RState",
                 "LocalComputer",
-                "Collected non-destructive Office Click-to-Run state."));
+                "Collected Office Click-to-Run state."));
 
             return state;
         }

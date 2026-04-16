@@ -27,7 +27,7 @@ The repository root does not receive compiled DLLs. Build outputs remain ignored
 
 ## Projects
 
-- `src/OfficeScrubC2R.Core`: detection, registry-view access, preflight state, scrub plans, and structured operation results.
+- `src/OfficeScrubC2R.Core`: detection, registry-view access, preflight state, scrub plans, guarded cleanup execution, and structured operation results.
 - `src/OfficeScrubC2R.PowerShell`: binary cmdlets for `Get-InstalledOfficeProducts`, `Test-OfficeC2RState`, and `Invoke-OfficeScrubC2R`.
 - `tests/OfficeScrubC2R.Core.Tests`: xUnit tests for core behavior.
 - `tests/OfficeScrubC2R.Tests.ps1`: Pester tests for the PowerShell module contract.
@@ -51,6 +51,8 @@ Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
 ```
 
 `Validate-Module.ps1` verifies the manifest, exact command exports, generated checksums, and absence of tracked `.dll` or `.pdb` files.
+
+If PowerShell has already imported a previous artifact, Windows can hold DLL locks under `artifacts/module`. `build.ps1 -Clean` falls back to a timestamped `artifacts/module-*` folder and records it in `artifacts/current-module.txt`; the root loader reads that file on the next import.
 
 ## Artifact Policy
 

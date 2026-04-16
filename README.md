@@ -1,6 +1,6 @@
 # OfficeScrubC2R
 
-OfficeScrubC2R is a hardened binary PowerShell module for inspecting Microsoft Office Click-to-Run state and planning future cleanup work. Version 3.0.0 is intentionally non-destructive: it detects installed Office C2R products, reports preflight state, and produces a scrub plan, but it does not delete files, registry keys, services, licenses, scheduled tasks, or installer metadata.
+OfficeScrubC2R is a hardened binary PowerShell module for inspecting and scrubbing Microsoft Office Click-to-Run state. Version 3.0.0 now includes guarded destructive execution for a first VBS-inspired cleanup slice: Office process termination, Office scheduled task deletion, Click-to-Run service stop/delete, C2R registry cleanup, known/detected C2R folder deletion with reboot scheduling fallback, and optional current-user license cache preservation.
 
 This repository includes Microsoft `OffScrubC2R.vbs` and earlier conversion sources as reference material. The shipped module is built from the SDK-style projects under `src/`.
 
@@ -10,11 +10,11 @@ This repository includes Microsoft `OffScrubC2R.vbs` and earlier conversion sour
 | --- | --- | --- |
 | `Get-InstalledOfficeProducts` | Reads Office C2R configuration and uninstall registry evidence across explicit 32-bit and 64-bit registry views. | No |
 | `Test-OfficeC2RState` | Reports elevation/SYSTEM status, C2R products, package paths, services, running Office processes, pending reboot-delete evidence, and preflight issues. | No |
-| `Invoke-OfficeScrubC2R -PlanOnly` | Returns a structured plan describing cleanup actions that a future full scrub implementation may perform. | No |
-| `Invoke-OfficeScrubC2R -WhatIf` | Exercises PowerShell `ShouldProcess` behavior and returns the same non-destructive plan. | No |
-| `Invoke-OfficeScrubC2R` | Blocks real cleanup with a terminating error. | No |
+| `Invoke-OfficeScrubC2R -PlanOnly` | Returns a structured plan describing cleanup actions. | No |
+| `Invoke-OfficeScrubC2R -WhatIf` | Exercises PowerShell `ShouldProcess` behavior and returns the same planning-only operation list. | No |
+| `Invoke-OfficeScrubC2R` | Runs the guarded cleanup executor from an elevated session and returns structured operation results. | Yes |
 
-`Invoke-OfficeScrubC2R` uses the stable error id `OfficeScrubC2R.DestructiveExecutionNotSupported` when destructive execution is attempted.
+`Invoke-OfficeScrubC2R` uses the stable error id `OfficeScrubC2R.AdminRequired` when destructive execution is attempted from a non-elevated session.
 
 ## Requirements
 
@@ -59,10 +59,11 @@ Invoke-OfficeScrubC2R -PlanOnly
 Invoke-OfficeScrubC2R -WhatIf
 ```
 
-Attempting real execution is blocked in this milestone:
+Real execution requires an elevated shell. Use `-Confirm:$false` only when you are ready for destructive cleanup:
 
 ```powershell
 Invoke-OfficeScrubC2R -Confirm:$false
+Invoke-OfficeScrubC2R -KeepLicense -Confirm:$false
 ```
 
 ## Structured Output
@@ -75,6 +76,13 @@ The core output types are:
 - `OfficeScrubC2R.OperationResult`
 
 `OperationResult` includes the step, action, target kind, target, registry hive/view when applicable, status, message, exception type, HRESULT, Win32 error, reboot scheduling state, and stable error id.
+
+After execution, inspect:
+
+```powershell
+$result = Invoke-OfficeScrubC2R -Confirm:$false
+$result.ExecutedOperations | Format-Table Step,Action,Status,Target -AutoSize
+```
 
 ## Test
 
@@ -89,4 +97,4 @@ CI validates the module in both Windows PowerShell 5.1 and PowerShell 7.
 
 ## Production Readiness
 
-Version 3.0.0 is a hardened baseline, not a production scrubber. Before destructive cleanup can be enabled, the project still needs signed release artifacts, published checksums, a VM-based destructive test matrix, full scrub parity, and clean Office reinstall validation after cleanup.
+Version 3.0.0 is a usable destructive milestone, not full OffScrubC2R parity yet. It does not yet run the Office Deployment Tool uninstall flow, every Windows Installer metadata branch, every COM TypeLib branch, all shell shortcut/taskband cleanup, or multi-profile license cleanup from the original VBScript. Before broad production use, the project still needs signed release artifacts, published checksums, a VM-based destructive test matrix, full scrub parity, and clean Office reinstall validation after cleanup.

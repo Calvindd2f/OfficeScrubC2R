@@ -41,7 +41,7 @@ Describe 'OfficeScrubC2R binary module contract' {
         ($state.Issues -is [System.Collections.IEnumerable]) | Should -BeTrue
     }
 
-    It 'returns a non-destructive scrub plan' {
+    It 'returns a planning-only scrub plan' {
         $plan = Invoke-OfficeScrubC2R -PlanOnly
 
         $plan.PSObject.TypeNames[0] | Should -Be 'OfficeScrubC2R.ScrubPlan'
@@ -53,11 +53,18 @@ Describe 'OfficeScrubC2R binary module contract' {
         $plan = Invoke-OfficeScrubC2R -WhatIf
 
         $plan.PSObject.TypeNames[0] | Should -Be 'OfficeScrubC2R.ScrubPlan'
+        $plan.ExecutionStatus | Should -Be 'WhatIf'
         $plan.PlannedOperations | Should -Not -BeNullOrEmpty
     }
 
-    It 'blocks real destructive execution with a stable error id' {
+    It 'blocks real destructive execution when not elevated with a stable error id' {
+        $state = Test-OfficeC2RState
+        if ($state.IsElevated) {
+            Set-ItResult -Skipped -Because 'This test must not run destructive cleanup on an elevated host.'
+            return
+        }
+
         { Invoke-OfficeScrubC2R -Confirm:$false -ErrorAction Stop } |
-            Should -Throw -ErrorId 'OfficeScrubC2R.DestructiveExecutionNotSupported,OfficeScrubC2R.PowerShell.InvokeOfficeScrubC2RCommand'
+            Should -Throw -ErrorId 'OfficeScrubC2R.AdminRequired,OfficeScrubC2R.PowerShell.InvokeOfficeScrubC2RCommand'
     }
 }

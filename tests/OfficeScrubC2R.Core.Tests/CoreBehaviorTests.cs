@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using Microsoft.Win32;
 using OfficeScrubC2R;
 using Xunit;
@@ -89,7 +90,7 @@ public sealed class CoreBehaviorTests
     }
 
     [Fact]
-    public void ScrubPlanner_BlocksExecutionAndReturnsPlanOnlyOperations()
+    public void ScrubPlanner_ReturnsPlanOnlyOperations()
     {
         var state = new OfficeC2RState
         {
@@ -105,12 +106,79 @@ public sealed class CoreBehaviorTests
         });
 
         var plan = ScrubPlanner.CreatePlan(state, keepLicense: true, planOnly: true);
-        var block = ScrubPlanner.CreateBlockedExecutionResult();
 
         Assert.True(plan.PlanOnly);
         Assert.True(plan.KeepLicense);
         Assert.Contains(plan.PlannedOperations, item => item.Status == OperationStatus.WouldRun);
-        Assert.Equal(OperationStatus.Blocked, block.Status);
-        Assert.Equal("OfficeScrubC2R.DestructiveExecutionNotSupported", block.ErrorId);
+    }
+
+    [Fact]
+    public void CleanupExecutor_DeletesRequestedDirectoryAndReportsResult()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "OfficeScrubC2R.Tests", Guid.NewGuid().ToString("N"));
+        var child = Path.Combine(root, "child");
+        Directory.CreateDirectory(child);
+        File.WriteAllText(Path.Combine(child, "sample.txt"), "delete me");
+
+        var request = new ScrubExecutionRequest
+        {
+            State = new OfficeC2RState { IsElevated = true, Is64BitOperatingSystem = true },
+            SkipBuiltInTargets = true
+        };
+        request.ExtraFileSystemTargets.Add(root);
+
+        var result = new CleanupExecutor().Execute(request);
+
+        Assert.False(Directory.Exists(root));
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Step == "Files" &&
+            item.Action == "DeleteDirectory" &&
+            item.Target == root &&
+            item.Status == OperationStatus.Completed);
+    }
+
+    [Fact]
+    public void CleanupExecutor_DeletesRequestedRegistryKeyAndReportsExplicitView()
+    {
+        var subKey = @"Software\OfficeScrubC2R\Tests\" + Guid.NewGuid().ToString("N");
+        using (var key = Registry.CurrentUser.CreateSubKey(subKey))
+        {
+            key!.SetValue("Value", "delete me");
+        }
+
+        var request = new ScrubExecutionRequest
+        {
+            State = new OfficeC2RState { IsElevated = true, Is64BitOperatingSystem = true },
+            SkipBuiltInTargets = true
+        };
+        request.ExtraRegistryTargets.Add(new RegistryTarget(RegistryHive.CurrentUser, subKey));
+
+        var result = new CleanupExecutor().Execute(request);
+
+        using var remaining = Registry.CurrentUser.OpenSubKey(subKey);
+        Assert.Null(remaining);
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Step == "Registry" &&
+            item.Action == "DeleteKey" &&
+            item.Target.EndsWith(subKey) &&
+            item.Status == OperationStatus.Completed &&
+            item.RegistryView.HasValue);
+    }
+
+    [Fact]
+    public void CleanupExecutor_BlocksWhenNotElevated()
+    {
+        var request = new ScrubExecutionRequest
+        {
+            State = new OfficeC2RState { IsElevated = false, Is64BitOperatingSystem = true },
+            SkipBuiltInTargets = true
+        };
+
+        var result = new CleanupExecutor().Execute(request);
+
+        Assert.Equal("Blocked", result.ExecutionStatus);
+        Assert.Contains(result.ExecutedOperations, item =>
+            item.Status == OperationStatus.Blocked &&
+            item.ErrorId == "OfficeScrubC2R.AdminRequired");
     }
 }
